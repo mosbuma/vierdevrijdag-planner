@@ -7,6 +7,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Same as marcflix-2025: host network during build so npm/registry works reliably on Synology.
+      network: host
     container_name: vierdevrijdag-app
     restart: unless-stopped
     network_mode: host
@@ -16,10 +18,11 @@ services:
       - PORT=3009 # ${PORT:-3000}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3009}
+    volumes:
+      # Persist generated meetup posters (optional but recommended on NAS).
+      - ./public/generated:/app/public/generated
     # With bridge network instead of host, use:
     # ports:
-    #   - "3000:3000"
+    #   - "3009:3009"
     # extra_hosts:
     #   - "host.docker.internal:host-gateway"
-    # volumes:
-    #   - ./public/generated:/app/public/generated

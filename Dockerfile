@@ -1,24 +1,24 @@
 # syntax=docker/dockerfile:1
-# Synology / slow networks: build with DOCKER_BUILDKIT=1. If the UI still times out,
-# run `docker build` from SSH with a longer client timeout or use a registry mirror.
+# Synology: use `DOCKER_BUILDKIT=1` and compose `build.network: host` (see docker-compose.yaml).
 
 # Stage 1: Dependencies
 FROM node:22-alpine AS deps
 WORKDIR /app
 
-# Prisma postinstall / engine download needs OpenSSL; libc6-compat avoids musl/glibc edge cases.
-# RUN apk add --no-cache openssl libc6-compat ca-certificates
+# Prisma postinstall / engine download needs OpenSSL on Alpine.
+RUN apk add --no-cache openssl libc6-compat ca-certificates
 
-# Env vars apply to npm ci (more reliable than flags on some npm versions).
-ENV NPM_CONFIG_FETCH_TIMEOUT=1200000 \
-    NPM_CONFIG_FETCH_RETRIES=10 \
-    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000 \
-    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=300000
+# Configure npm for slow / flaky networks (same idea as marcflix-2025 reference).
+RUN npm config set fetch-timeout 600000 && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000
+
+# Update npm and clear cache — avoids sporadic "Exit handler never called" on NAS builds.
+RUN npm install -g npm@latest && npm cache clean --force
 
 COPY package.json package-lock.json* ./
-# Cache tarball downloads between rebuilds (needs BuildKit).
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund
+RUN npm ci --prefer-offline --no-audit --fetch-timeout=600000
 
 # Stage 2: Builder
 FROM node:22-alpine AS builder
@@ -29,7 +29,6 @@ RUN apk add --no-cache openssl libc6-compat ca-certificates
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Low-RAM NAS (Synology): avoid OOM during generate / Next compile.
 ENV NODE_OPTIONS=--max-old-space-size=3072
 RUN npx prisma generate
 
