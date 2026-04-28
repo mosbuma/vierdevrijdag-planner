@@ -3,7 +3,7 @@
 /** Select value for the hard-coded dummy meetup when the DB has no meetings. */
 export const TEMPLATE_EDITOR_DUMMY_MEETING_ID = -1;
 
-/** JPEG path under `public/` for the poster template editor preview for this template id. */
+/** URL/db rel path for the template editor preview JPEG (file lives under POSTER_STORAGE_DIR). */
 export function templateEditorPreviewRelPath(posterTemplateId: number): string {
   return `generated/posters/template-preview-${posterTemplateId}.jpg`;
 }

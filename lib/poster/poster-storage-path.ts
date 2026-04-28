@@ -11,7 +11,8 @@ const URL_PREFIX = "generated/posters/";
 export function getPosterStorageDir(): string {
   const fromEnv = process.env.POSTER_STORAGE_DIR?.trim();
   if (fromEnv) return path.resolve(fromEnv);
-  return path.join(process.cwd(), "storage", "posters");
+  /** Same layout as Docker Compose: `./data/posters` under the project root. */
+  return path.join(process.cwd(), "data", "posters");
 }
 
 /**

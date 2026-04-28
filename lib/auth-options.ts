@@ -2,7 +2,12 @@ import type { NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { authenticateUser } from "@/lib/auth-utils";
-import { SESSION_COOKIE_NAME } from "@/lib/auth-cookie-name";
+import {
+  AUTH_COOKIE_SECURE,
+  CALLBACK_URL_COOKIE_NAME,
+  CSRF_TOKEN_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+} from "@/lib/auth-cookie-name";
 import { writeAuditLog } from "@/lib/audit-log";
 
 export const authOptions: NextAuthOptions = {
@@ -87,31 +92,25 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: AUTH_COOKIE_SECURE,
       },
     },
     callbackUrl: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-vierdevrijdag.callback-url"
-          : "vierdevrijdag.callback-url",
+      name: CALLBACK_URL_COOKIE_NAME,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: AUTH_COOKIE_SECURE,
       },
     },
     csrfToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Host-vierdevrijdag.csrf-token"
-          : "vierdevrijdag.csrf-token",
+      name: CSRF_TOKEN_COOKIE_NAME,
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: AUTH_COOKIE_SECURE,
       },
     },
   },

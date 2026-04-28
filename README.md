@@ -34,6 +34,7 @@ Next.js app to manage meetup programs (timeslots, speakers, visibility) and publ
 ```bash
 npm install
 npx prisma generate
+mkdir -p data/posters
 npm run dev
 ```
 
@@ -52,7 +53,7 @@ Useful scripts:
 
 Build and run with the same env vars as production. [`docker-compose.yaml`](docker-compose.yaml) uses `network_mode: host` so `DATABASE_URL` can use `localhost:3306` when MariaDB runs on the same NAS.
 
-**Poster files** are stored under **`POSTER_STORAGE_DIR`** (default in the image: `/data/posters`), not under `public/generated`. URLs are still `/generated/posters/…`; a route handler serves the JPEGs so Next.js never runs `scandir` on a bind-mounted `public/generated` (which used to crash with **EACCES** on Synology). Compose mounts **`./data/posters:/data/posters`** — create the host dir before first run: `mkdir -p data/posters`.
+**Poster files** are stored under **`POSTER_STORAGE_DIR`**. Locally (and in the container) the default is **`./data/posters`** under the project root (`/data/posters` in Docker matches that via the bind-mount), not under `public/generated`. URLs are still `/generated/posters/…`; a route handler serves the JPEGs so Next.js never runs `scandir` on a bind-mounted `public/generated` (which used to crash with **EACCES** on Synology). Compose mounts **`./data/posters:/data/posters`** — create the host dir before first run: `mkdir -p data/posters`.
 
 If you have old files in `public/generated/posters/`, move them to `data/posters/` on the host (same filenames). **`user: "0:0"`** matches marcflix for root-owned NAS mounts; use **`chown -R 1001:1001 data/posters`** and drop `user` if you prefer the Dockerfile `nextjs` user.
 
@@ -69,7 +70,7 @@ If **Container Manager** stops the build during `npm ci`, open **SSH**, `cd` to 
 
 The Docker build follows the same pattern as **marcflix-2025** (Synology-tested). The runner image installs **`ttf-dejavu`** only, so poster text has fonts on minimal Alpine.
 
-Point your reverse proxy at `PORT` (see `Dockerfile` / compose; default in README examples was 3000). Set `NEXTAUTH_URL` to the **public HTTPS URL** (no trailing slash) so cookies work securely.
+Point your reverse proxy at `PORT` (see `Dockerfile` / compose; default in README examples was 3000). Set **`NEXTAUTH_URL`** to the **exact URL you open in the browser** (scheme, host, port; no trailing slash). If you use **`http://192.168.x.x:3009`** on the LAN, `NEXTAUTH_URL` must use **`http://`**, not `https://`, or session cookies are rejected and **login appears to fail** even with correct credentials. Behind a reverse proxy with HTTPS, use your public `https://…` URL and often **`AUTH_TRUST_HOST=true`** (see `.env.example`).
 
 ## Roles
 
