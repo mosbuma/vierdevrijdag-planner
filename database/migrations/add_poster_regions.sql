@@ -1,0 +1,2 @@
+-- Superseded: poster regions now live on the `posters` table.
+-- Use `add_poster_templates.sql` for upgrading an existing database.

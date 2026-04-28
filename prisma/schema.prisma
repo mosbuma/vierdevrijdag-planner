@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id            Int      @id @default(autoincrement())
+  username      String   @unique @db.VarChar(255)
+  password_hash String   @map("password_hash") @db.VarChar(255)
+  role          Role     @default(USER)
+  created_at    DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updated_at    DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("users")
+}
+
+/** Poster template: layout regions on a shared image; meetups reference a template and keep their own export path. */
+model Poster {
+  id                 Int      @id @default(autoincrement())
+  name               String   @db.VarChar(128)
+  slug               String   @unique @db.VarChar(64)
+  template_rel_path  String   @default("template.png") @map("template_rel_path") @db.VarChar(512)
+  title_region       Json?    @map("title_region")
+  program_region     Json?    @map("program_region")
+  sort_order         Int      @default(0) @map("sort_order")
+  created_at         DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updated_at         DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+
+  meetings Meeting[]
+
+  @@index([sort_order])
+  @@map("posters")
+}
+
+model Meeting {
+  id              Int      @id @default(autoincrement())
+  meetup_date     DateTime @map("meetup_date") @db.Date
+  visible_from    DateTime @map("visible_from") @db.Date
+  venue_line      String   @map("venue_line") @db.VarChar(512)
+  event_title     String   @default("VierDeVrijdag") @map("event_title") @db.VarChar(255)
+  poster_id       Int      @default(1) @map("poster_id")
+  poster_rel_path String?  @map("poster_rel_path") @db.VarChar(512)
+  is_template     Boolean  @default(false) @map("is_template")
+  created_at      DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updated_at      DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+
+  poster Poster       @relation(fields: [poster_id], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tracks MeetingTrack[]
+  items  ProgramItem[]
+
+  @@unique([meetup_date])
+  @@index([meetup_date])
+  @@index([visible_from])
+  @@index([poster_id])
+  @@map("meetings")
+}
+
+model MeetingTrack {
+  id         Int      @id @default(autoincrement())
+  meeting_id Int      @map("meeting_id")
+  name       String   @db.VarChar(100)
+  sort_order Int      @default(0) @map("sort_order")
+  created_at DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updated_at DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+
+  meeting Meeting       @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+  items   ProgramItem[]
+
+  @@index([meeting_id])
+  @@map("meeting_tracks")
+}
+
+model ProgramItem {
+  id          Int      @id @default(autoincrement())
+  meeting_id  Int      @map("meeting_id")
+  track_id    Int      @map("track_id")
+  slot_start  DateTime @map("slot_start") @db.Time(0)
+  slot_end    DateTime @map("slot_end") @db.Time(0)
+  description String   @db.Text
+  speakers    String?  @db.VarChar(1024)
+  sort_order  Int      @default(0) @map("sort_order")
+  created_at  DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updated_at  DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+
+  meeting Meeting      @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+  track   MeetingTrack @relation(fields: [track_id], references: [id], onDelete: Cascade)
+
+  @@index([meeting_id])
+  @@index([track_id])
+  @@map("program_items")
+}
+
+/** Append-only audit trail for authenticated mutations (API routes). */
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  created_at DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  username   String   @db.VarChar(255)
+  action     String   @db.VarChar(128)
+  subject    String?  @db.VarChar(255)
+  changes    Json?    @map("changes")
+
+  @@index([created_at])
+  @@index([username])
+  @@map("audit_logs")
+}

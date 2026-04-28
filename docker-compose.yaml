@@ -1,0 +1,24 @@
+# Synology / NAS — adjust DATABASE_URL and NEXTAUTH_* via env file or environment block.
+# Poster JPGs are written under public/generated/posters at runtime; bind-mount so they persist.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vierdevrijdag-app
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - NODE_ENV=production
+      - PORT=${PORT:-3000}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+    # With bridge network instead of host, use:
+    # ports:
+    #   - "3000:3000"
+    # extra_hosts:
+    #   - "host.docker.internal:host-gateway"
+    volumes:
+      - ./public/generated:/app/public/generated
