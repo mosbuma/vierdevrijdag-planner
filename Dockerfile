@@ -7,7 +7,7 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 
 # Prisma postinstall / engine download needs OpenSSL; libc6-compat avoids musl/glibc edge cases.
-RUN apk add --no-cache openssl libc6-compat ca-certificates
+# RUN apk add --no-cache openssl libc6-compat ca-certificates
 
 # Env vars apply to npm ci (more reliable than flags on some npm versions).
 ENV NPM_CONFIG_FETCH_TIMEOUT=1200000 \
