@@ -1,5 +1,11 @@
 # Synology / NAS — adjust DATABASE_URL and NEXTAUTH_* via env file or environment block.
 # Poster JPGs are written under public/generated/posters at runtime; bind-mount so they persist.
+#
+# `build.network: host` matches marcflix-2025 and needs a BuildKit-capable builder. If you see
+# "mount option requires BuildKit", enable it for this shell (same as modern Docker Desktop):
+#   export DOCKER_BUILDKIT=1
+#   export COMPOSE_DOCKER_CLI_BUILD=1
+#   docker compose build
 version: '3.8'
 
 services:

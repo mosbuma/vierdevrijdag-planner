@@ -1,6 +1,3 @@
-# syntax=docker/dockerfile:1
-# Synology: use `DOCKER_BUILDKIT=1` and compose `build.network: host` (see docker-compose.yaml).
-
 # Stage 1: Dependencies
 FROM node:22-alpine AS deps
 WORKDIR /app

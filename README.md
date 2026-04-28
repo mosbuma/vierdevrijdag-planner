@@ -52,10 +52,11 @@ Useful scripts:
 
 Build and run with the same env vars as production. [`docker-compose.yaml`](docker-compose.yaml) uses `network_mode: host` so `DATABASE_URL` can use `localhost:3306` when MariaDB runs on the same NAS. Bind-mount `./public/generated` so generated posters survive container restarts.
 
-[`docker-compose.yaml`](docker-compose.yaml) sets **`build.network: host`** (same pattern as the working marcflix-2025 reference) so **`npm ci` / Prisma** can reach the registry during the image build on Synology. Enable BuildKit if you like:
+[`docker-compose.yaml`](docker-compose.yaml) sets **`build.network: host`** (same as marcflix-2025) so **`npm ci` / Prisma** can reach the registry during the image build. On some engines (including older Synology setups) you must turn BuildKit on for that option:
 
 ```bash
 export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
 docker compose build
 docker compose --env-file .env up -d
 ```
