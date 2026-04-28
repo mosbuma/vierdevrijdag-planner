@@ -52,12 +52,19 @@ Useful scripts:
 
 Build and run with the same env vars as production. [`docker-compose.yaml`](docker-compose.yaml) uses `network_mode: host` so `DATABASE_URL` can use `localhost:3306` when MariaDB runs on the same NAS. Bind-mount `./public/generated` so generated posters survive container restarts.
 
+Enable BuildKit (faster retries, npm download cache between rebuilds) and use a generous client timeout if `npm ci` appears to hang:
+
 ```bash
-docker compose build
+export DOCKER_BUILDKIT=1
+COMPOSE_DOCKER_CLI_BUILD=1 docker compose build
 docker compose --env-file .env up -d
 ```
 
-Point your reverse proxy at `PORT` (default 3000). Set `NEXTAUTH_URL` to the **public HTTPS URL** (no trailing slash) so cookies work securely.
+If **Container Manager** stops the build during `npm ci`, open **SSH**, `cd` to the project, and run the same `docker compose build` from the shell (no UI timeout), or build the image on a faster machine and `docker save` / `docker load` on the NAS.
+
+`npx prisma generate` on **Alpine** needs OpenSSL libraries; the Dockerfile installs `openssl` and `libc6-compat` before `npm ci` (Prisma’s postinstall) and again in the builder/runner images. If the build still dies with **JavaScript heap out of memory**, lower other memory use or assign more RAM to Docker, then try reducing `NODE_OPTIONS=--max-old-space-size` in the Dockerfile (e.g. `2048`).
+
+Point your reverse proxy at `PORT` (see `Dockerfile` / compose; default in README examples was 3000). Set `NEXTAUTH_URL` to the **public HTTPS URL** (no trailing slash) so cookies work securely.
 
 ## Roles
 
