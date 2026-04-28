@@ -63,7 +63,7 @@ docker compose --env-file .env up -d
 
 If **Container Manager** stops the build during `npm ci`, open **SSH**, `cd` to the project, and run the same `docker compose build` from the shell (no UI timeout), or build the image on a faster machine and `docker save` / `docker load` on the NAS.
 
-`npx prisma generate` on **Alpine** needs OpenSSL libraries; the Dockerfile installs `openssl` and `libc6-compat` before `npm ci` (Prisma’s postinstall) and again in the builder/runner images. If the build still dies with **JavaScript heap out of memory**, lower other memory use or assign more RAM to Docker, then try reducing `NODE_OPTIONS=--max-old-space-size` in the Dockerfile (e.g. `2048`).
+The Docker build follows the same pattern as **marcflix-2025** (Synology-tested). The runner image installs **`ttf-dejavu`** only, so poster text has fonts on minimal Alpine.
 
 Point your reverse proxy at `PORT` (see `Dockerfile` / compose; default in README examples was 3000). Set `NEXTAUTH_URL` to the **public HTTPS URL** (no trailing slash) so cookies work securely.
 
