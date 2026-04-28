@@ -50,7 +50,11 @@ Useful scripts:
 
 ## Docker (e.g. Synology NAS)
 
-Build and run with the same env vars as production. [`docker-compose.yaml`](docker-compose.yaml) uses `network_mode: host` so `DATABASE_URL` can use `localhost:3306` when MariaDB runs on the same NAS. Bind-mount `./public/generated` so generated posters survive container restarts.
+Build and run with the same env vars as production. [`docker-compose.yaml`](docker-compose.yaml) uses `network_mode: host` so `DATABASE_URL` can use `localhost:3306` when MariaDB runs on the same NAS.
+
+**Poster files** are stored under **`POSTER_STORAGE_DIR`** (default in the image: `/data/posters`), not under `public/generated`. URLs are still `/generated/posters/…`; a route handler serves the JPEGs so Next.js never runs `scandir` on a bind-mounted `public/generated` (which used to crash with **EACCES** on Synology). Compose mounts **`./data/posters:/data/posters`** — create the host dir before first run: `mkdir -p data/posters`.
+
+If you have old files in `public/generated/posters/`, move them to `data/posters/` on the host (same filenames). **`user: "0:0"`** matches marcflix for root-owned NAS mounts; use **`chown -R 1001:1001 data/posters`** and drop `user` if you prefer the Dockerfile `nextjs` user.
 
 [`docker-compose.yaml`](docker-compose.yaml) sets **`build.network: host`** (same as marcflix-2025) so **`npm ci` / Prisma** can reach the registry during the image build. On some engines (including older Synology setups) you must turn BuildKit on for that option:
 

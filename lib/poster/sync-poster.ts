@@ -3,6 +3,7 @@ import { toAmsterdamYmd } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import { formatTimeFromDb, writePosterJpeg, type PosterProgramLine } from "@/lib/poster/generate-poster";
 import { parseStoredPosterRegions } from "@/lib/poster/poster-regions";
+import { posterFileAbsolutePath } from "@/lib/poster/poster-storage-path";
 
 type ItemWithTrack = {
   slot_start: Date;
@@ -50,7 +51,7 @@ export async function syncPosterForMeeting(meetingId: number): Promise<void> {
 
   const ymd = toAmsterdamYmd(meeting.meetup_date).replace(/-/g, "");
   const rel = `generated/posters/${ymd}.jpg`;
-  const outAbs = path.join(process.cwd(), "public", rel);
+  const outAbs = posterFileAbsolutePath(rel);
 
   const poster = meeting.poster;
   const regions = parseStoredPosterRegions(poster.title_region, poster.program_region);

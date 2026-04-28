@@ -51,6 +51,7 @@ RUN apk add --no-cache ttf-dejavu
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
+ENV POSTER_STORAGE_DIR /data/posters
 
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs

@@ -7,6 +7,7 @@ import {
 } from "@/lib/poster/dummy-template-preview-constants";
 import { writePosterJpeg, type PosterProgramLine } from "@/lib/poster/generate-poster";
 import { parseStoredPosterRegions } from "@/lib/poster/poster-regions";
+import { posterFileAbsolutePath } from "@/lib/poster/poster-storage-path";
 import { buildPosterProgramLinesFromItems } from "@/lib/poster/sync-poster";
 
 const DUMMY_PROGRAM_LINES: PosterProgramLine[] = [
@@ -27,7 +28,7 @@ export async function renderTemplateEditorPreview(posterTemplateId: number, meet
   const relTemplate = poster.template_rel_path.replace(/^\//, "");
   const templateAbs = path.join(process.cwd(), "public", relTemplate);
   const outRel = templateEditorPreviewRelPath(posterTemplateId);
-  const outAbs = path.join(process.cwd(), "public", outRel);
+  const outAbs = posterFileAbsolutePath(outRel);
 
   let eventTitle: string;
   let meetupDate: Date;
