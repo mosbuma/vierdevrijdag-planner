@@ -81,6 +81,7 @@ export async function createMeetingFromTemplate(): Promise<CreateFromTemplateRes
         event_title: full.event_title,
         poster_id: full.poster_id,
         poster_rel_path: null,
+        program_description_html: full.program_description_html,
         is_template: false,
       },
     });
@@ -107,6 +108,7 @@ export async function createMeetingFromTemplate(): Promise<CreateFromTemplateRes
           slot_start: it.slot_start,
           slot_end: it.slot_end,
           description: it.description,
+          row_description_html: it.row_description_html,
           speakers: it.speakers,
           sort_order: it.sort_order,
         },

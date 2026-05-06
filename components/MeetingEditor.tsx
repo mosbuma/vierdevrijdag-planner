@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { MeetingRichTextEditor } from "@/components/MeetingRichTextEditor";
 
 type Track = { id: number; name: string; sort_order: number };
 type Item = {
@@ -11,6 +11,8 @@ type Item = {
   slot_start: string;
   slot_end: string;
   description: string;
+  /** Rich text for `/event` via `{program}` in meeting description. */
+  row_description_html?: string | null;
   speakers: string | null;
   sort_order: number;
 };
@@ -22,14 +24,16 @@ type Meeting = {
   event_title: string;
   poster_id: number;
   poster_rel_path: string | null;
+  program_description_html?: string | null;
   is_template?: boolean;
+  updated_at?: string;
   tracks: Track[];
   items: Item[];
 };
 
 type PosterOption = { id: number; name: string };
 
-type Draft = { start: string; end: string; desc: string; speakers: string };
+type Draft = { start: string; end: string; desc: string; rowDescHtml: string; speakers: string };
 type ProgramSortKey = "slot_start" | "slot_end" | "track" | "description" | "speakers";
 
 function isoDate(d: string) {
@@ -67,9 +71,16 @@ function sortTracksList(list: Track[]) {
 
 function defaultDraftForTrack(trackId: number, allItems: Item[]): Draft {
   const list = sortTrackItems(allItems.filter((i) => i.track_id === trackId));
-  if (list.length === 0) return { start: "19:00", end: "19:30", desc: "", speakers: "" };
+  if (list.length === 0) return { start: "19:00", end: "19:30", desc: "", rowDescHtml: "", speakers: "" };
   const lastEnd = list[list.length - 1].slot_end;
-  return { start: lastEnd, end: addMinutes(lastEnd, 30), desc: "", speakers: "" };
+  return { start: lastEnd, end: addMinutes(lastEnd, 30), desc: "", rowDescHtml: "", speakers: "" };
+}
+
+function stripTagsPreview(html: string | null | undefined, max = 72): string {
+  if (!html?.trim()) return "—";
+  const t = html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1)}…`;
 }
 
 function trackTie(a: Item, b: Item, trackMeta: Map<number, Track>): number {
@@ -222,6 +233,13 @@ export function MeetingEditor({
   const [venue_line, setVenue] = useState(meeting.venue_line);
   const [event_title, setTitle] = useState(meeting.event_title);
   const [poster_id, setPosterId] = useState(meeting.poster_id);
+  const [programDescriptionHtml, setProgramDescriptionHtml] = useState(
+    () => meeting.program_description_html ?? "",
+  );
+
+  useEffect(() => {
+    setProgramDescriptionHtml(meeting.program_description_html ?? "");
+  }, [meeting.id, meeting.updated_at, meeting.program_description_html]);
   const [items, setItems] = useState<Item[]>(() =>
     meeting.items.map((it) => ({
       ...it,
@@ -246,8 +264,8 @@ export function MeetingEditor({
     return { track_id: tid, ...defaultDraftForTrack(tid, base) };
   });
   const [newTrackName, setNewTrackName] = useState("");
-  /** Bumps after a successful poster regen so the preview image refetches (same path, new file). */
-  const [posterPreviewKey, setPosterPreviewKey] = useState(0);
+  /** Bumps after save or poster regen so the /event iframe reloads (DB-backed preview). */
+  const [eventPreviewKey, setEventPreviewKey] = useState(0);
   const [posterRegenerating, setPosterRegenerating] = useState(false);
 
   useEffect(() => {
@@ -298,7 +316,14 @@ export function MeetingEditor({
     const res = await fetch(`/api/meetings/${meeting.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ meetup_date, visible_from, venue_line, event_title, poster_id }),
+      body: JSON.stringify({
+        meetup_date,
+        visible_from,
+        venue_line,
+        event_title,
+        poster_id,
+        program_description_html: programDescriptionHtml.trim() ? programDescriptionHtml : null,
+      }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -306,7 +331,7 @@ export function MeetingEditor({
       return;
     }
     // PATCH regenerates the JPEG (same path as before); bust cache so the new template shows immediately.
-    setPosterPreviewKey((k) => k + 1);
+    setEventPreviewKey((k) => k + 1);
     router.refresh();
     setMsg("Opgeslagen.");
   }
@@ -321,7 +346,7 @@ export function MeetingEditor({
         setMsg(data.error ?? "Poster genereren mislukt");
         return;
       }
-      setPosterPreviewKey((k) => k + 1);
+      setEventPreviewKey((k) => k + 1);
       router.refresh();
       setMsg("Poster opnieuw gegenereerd.");
     } finally {
@@ -340,6 +365,7 @@ export function MeetingEditor({
         slot_start: newDraft.start,
         slot_end: newDraft.end,
         description: newDraft.desc,
+        row_description_html: newDraft.rowDescHtml.trim() ? newDraft.rowDescHtml : null,
         speakers: newDraft.speakers || null,
       }),
     });
@@ -357,13 +383,14 @@ export function MeetingEditor({
         slot_start: timeFromIso(String(data.slot_start)),
         slot_end: endT,
         description: data.description,
+        row_description_html: data.row_description_html ?? null,
         speakers: data.speakers,
         sort_order: data.sort_order,
       },
     ]);
     setNewDraft((prev) =>
       prev.track_id === data.track_id
-        ? { ...prev, start: endT, end: addMinutes(endT, 30), desc: "", speakers: "" }
+        ? { ...prev, start: endT, end: addMinutes(endT, 30), desc: "", rowDescHtml: "", speakers: "" }
         : prev
     );
     router.refresh();
@@ -381,6 +408,7 @@ export function MeetingEditor({
         description: it.description,
         speakers: it.speakers,
         sort_order: it.sort_order,
+        row_description_html: it.row_description_html?.trim() ? it.row_description_html : null,
       }),
     });
     if (!res.ok) {
@@ -637,28 +665,57 @@ export function MeetingEditor({
                   )}
                 </select>
                 <p className="mt-1 text-xs text-slate-500">Lay-out en tekstvakken worden beheerd onder Posters in het menu.</p>
+                <button
+                  type="button"
+                  className="mt-2"
+                  disabled={posterRegenerating}
+                  onClick={() => void regeneratePosterJpeg()}
+                >
+                  Poster-JPEG opnieuw genereren
+                </button>
+              </div>
+              <div>
+                <label className="block">Programma &amp; tekst (publieke pagina)</label>
+                <p className="mt-1 text-xs text-slate-500">
+                  Vet, cursief, links en lijsten. Wordt getoond onder de poster op <code className="text-slate-400">/event</code>.
+                  Gebruik <code className="text-slate-400">{"{date}"}</code> voor de meetupdatum (Nederlands; zonder jaartal als het
+                  huidige jaar is), <code className="text-slate-400">{"{program}"}</code> voor het programma (starttijd + poster­titel op één regel, daaronder de website­tekst per onderdeel; extra wit tussen onderdelen),{" "}
+                  <code className="text-slate-400">{"{programlink}"}</code> voor een link naar deze
+                  evenementpagina (zelfde URL als op vierdevrijdag.org), en{" "}
+                  <code className="text-slate-400">{"{location}"}</code> voor de inhoud van het veld <strong className="text-slate-400">Locatie</strong>{" "}
+                  hierboven.
+                </p>
+                <div className="mt-2">
+                  <MeetingRichTextEditor
+                    key={`rt-${meeting.id}-${meeting.updated_at}`}
+                    metatagInsertButtons
+                    initialHtml={programDescriptionHtml}
+                    onHtmlChange={setProgramDescriptionHtml}
+                  />
+                </div>
               </div>
               <button type="submit">Gegevens opslaan</button>
             </form>
 
-            <div className="w-full shrink-0 space-y-3 lg:sticky lg:top-4 lg:w-[min(100%,20rem)]">
-              <h2 className="text-sm font-semibold text-slate-300">Poster</h2>
-              {meeting.poster_rel_path ? (
-                <Image
-                  key={posterPreviewKey}
-                  src={`/${meeting.poster_rel_path}?v=${posterPreviewKey}`}
-                  alt="Poster voor deze meetup"
-                  width={937}
-                  height={1678}
-                  className="w-full rounded border border-slate-600"
-                  unoptimized
-                />
-              ) : (
-                <p className="text-sm text-slate-400">Nog geen posterbestand. Klik op Vernieuwen om te genereren.</p>
-              )}
-              <button type="button" disabled={posterRegenerating} onClick={() => void regeneratePosterJpeg()}>
-                Vernieuwen
-              </button>
+            <div className="w-full shrink-0 space-y-3 lg:sticky lg:top-4 lg:min-w-[min(100%,22rem)] lg:max-w-xl">
+              <h2 className="text-sm font-semibold text-slate-300">Voorbeeld /event</h2>
+              <p className="text-xs text-slate-500">
+                Data uit de database na <strong className="font-normal text-slate-400">Gegevens opslaan</strong>.{" "}
+                <a
+                  href={`/event?previewId=${meeting.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-teal-400 underline"
+                >
+                  Open in nieuw tabblad
+                </a>
+              </p>
+              <iframe
+                key={eventPreviewKey}
+                title="Voorbeeld evenementpagina"
+                src={`/event?previewId=${meeting.id}`}
+                className="h-[min(85vh,56rem)] w-full rounded-lg border border-slate-600 bg-slate-950 shadow-lg"
+              />
             </div>
           </div>
 
@@ -675,8 +732,11 @@ export function MeetingEditor({
       {editorTab === "programma" && (
         <div className="space-y-4 pt-2" role="tabpanel" id="panel-programma" aria-labelledby="tab-programma">
           <h2 className="font-semibold text-white">Programma</h2>
-          <p className="text-sm text-slate-500">
-            Tijden als HH:mm (24-uurs). Standaard gesorteerd op starttijd
+              <p className="text-sm text-slate-500">
+            Tijden als HH:mm (24-uurs). Kolom <strong className="text-slate-400">Poster</strong> = tekst op het poster‑JPEG;{" "}
+            <strong className="text-slate-400">Website</strong> = rijke tekst op <code className="text-slate-400">/event</code> (o.a. in{" "}
+            <code className="text-slate-400">{"{program}"}</code>
+            ). Standaard gesorteerd op starttijd
             {showProgramTrackColumn
               ? ", daarna track. Klik op een kolomkop om te sorteren; in de track-kolom kun je filteren."
               : ". Klik op een kolomkop om te sorteren."}
@@ -714,8 +774,11 @@ export function MeetingEditor({
                     </SortHeader>
                   </th>
                 ) : null}
-                <th className="align-top">
-                  <SortHeader label="Omschrijving" sortKey="description" activeKey={sortKey} dir={sortDir} onSort={onProgramSort} />
+                <th className="min-w-[10rem] align-top">
+                  <SortHeader label="Poster" sortKey="description" activeKey={sortKey} dir={sortDir} onSort={onProgramSort} />
+                </th>
+                <th className="min-w-[12rem] align-top max-w-xs">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Website</span>
                 </th>
                 <th className="min-w-[8rem] align-top">
                   <SortHeader label="Spreker(s)" sortKey="speakers" activeKey={sortKey} dir={sortDir} onSort={onProgramSort} />
@@ -728,7 +791,7 @@ export function MeetingEditor({
             <tbody>
               {displayedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={showProgramTrackColumn ? 6 : 5} className="text-slate-500">
+                  <td colSpan={showProgramTrackColumn ? 7 : 6} className="text-slate-500">
                     Geen programma-items{trackFilterId !== "all" ? " voor dit filter" : ""}.
                   </td>
                 </tr>
@@ -741,8 +804,10 @@ export function MeetingEditor({
                   const trackName = showProgramTrackColumn
                     ? trackMap.get(it.track_id)?.name ?? `Track #${it.track_id}`
                     : "";
+                  const colSpan = showProgramTrackColumn ? 7 : 6;
                   return (
-                    <tr key={it.id} className={isEditing ? "bg-slate-800/60" : undefined}>
+                    <Fragment key={it.id}>
+                    <tr className={isEditing ? "bg-slate-800/60" : undefined}>
                       <td>
                         {isEditing ? (
                           <input
@@ -803,6 +868,15 @@ export function MeetingEditor({
                           <span className="text-slate-200">{it.description}</span>
                         )}
                       </td>
+                      <td className="max-w-[14rem] text-sm text-slate-400">
+                        {isEditing ? (
+                          <span className="text-slate-500">Zie editor hieronder</span>
+                        ) : (
+                          <span className="line-clamp-2" title={stripTagsPreview(it.row_description_html, 500)}>
+                            {stripTagsPreview(it.row_description_html)}
+                          </span>
+                        )}
+                      </td>
                       <td>
                         {isEditing ? (
                           <input
@@ -847,6 +921,25 @@ export function MeetingEditor({
                         </div>
                       </td>
                     </tr>
+                    {isEditing ? (
+                      <tr className="bg-slate-800/35">
+                        <td colSpan={colSpan} className="p-4">
+                          <label className="mb-2 block text-xs font-medium text-slate-400">
+                            Website-tekst (vet, links, enz.; verschijnt op <code className="text-slate-500">/event</code> en in{" "}
+                            <code className="text-slate-500">{"{program}"}</code>)
+                          </label>
+                          <MeetingRichTextEditor
+                            key={`row-rt-${it.id}`}
+                            compact
+                            initialHtml={it.row_description_html ?? ""}
+                            onHtmlChange={(html) =>
+                              setItems((p) => p.map((x) => (x.id === it.id ? { ...x, row_description_html: html } : x)))
+                            }
+                          />
+                        </td>
+                      </tr>
+                    ) : null}
+                    </Fragment>
                   );
                 })
               )}
@@ -892,7 +985,7 @@ export function MeetingEditor({
               </div>
             ) : null}
             <div className="sm:col-span-2 lg:col-span-2">
-              <label className="text-xs">Omschrijving</label>
+              <label className="text-xs">Poster (korte tekst)</label>
               <input
                 className="mt-1 w-full"
                 value={newDraft.desc}
@@ -906,6 +999,17 @@ export function MeetingEditor({
                 className="mt-1 w-full"
                 value={newDraft.speakers}
                 onChange={(e) => setNewDraft((p) => ({ ...p, speakers: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-slate-400">Website-tekst voor dit onderdeel (optioneel)</label>
+            <div className="mt-2">
+              <MeetingRichTextEditor
+                key={`nrte-${newDraft.track_id}-${items.length}`}
+                compact
+                initialHtml={newDraft.rowDescHtml}
+                onHtmlChange={(html) => setNewDraft((p) => ({ ...p, rowDescHtml: html }))}
               />
             </div>
           </div>

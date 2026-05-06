@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { patchMeetingSchema } from "@/lib/validators";
 import { dateFromYmd } from "@/lib/date-parse";
+import { sanitizeMeetingDescriptionHtml } from "@/lib/meeting-html";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
 import { writeAuditLog } from "@/lib/audit-log";
 
@@ -53,18 +54,35 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (parsed.data.poster_id !== undefined) {
     data.poster = { connect: { id: parsed.data.poster_id } };
   }
+  if (parsed.data.program_description_html !== undefined) {
+    data.program_description_html = sanitizeMeetingDescriptionHtml(parsed.data.program_description_html);
+  }
   if (Object.keys(data).length === 0) return jsonError("No fields to update", 400);
+
+  const needsPosterResync =
+    parsed.data.meetup_date != null ||
+    parsed.data.visible_from != null ||
+    parsed.data.venue_line != null ||
+    parsed.data.event_title != null ||
+    parsed.data.poster_id !== undefined;
+
   try {
     await prisma.meeting.update({
       where: { id: nid },
       data,
     });
-    await syncPosterForMeeting(nid);
+    if (needsPosterResync) {
+      await syncPosterForMeeting(nid);
+    }
+    const auditChanges: Record<string, unknown> = { ...parsed.data };
+    if (parsed.data.program_description_html !== undefined) {
+      auditChanges.program_description_html = data.program_description_html ? "[sanitized html]" : null;
+    }
     await writeAuditLog({
       username: auth.username,
       action: "meetings.PATCH",
       subject: `meeting:${nid}`,
-      changes: parsed.data,
+      changes: auditChanges,
     });
     const row = await prisma.meeting.findUnique({
       where: { id: nid },

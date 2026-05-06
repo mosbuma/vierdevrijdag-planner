@@ -3,10 +3,15 @@ import path from "node:path";
 const URL_PREFIX = "generated/posters/";
 
 /**
- * Directory for meetup / template preview JPEGs on disk.
- * URLs stay `/generated/posters/...` (served by `app/generated/posters/[file]/route.ts`).
- * Keeping files outside `public/` avoids Next.js scanning a bind-mounted `public/generated`
- * that may be root-only on NAS (EACCES crash at startup).
+ * **Single storage location for poster JPEGs on disk:** `POSTER_STORAGE_DIR` (default `./data/posters`,
+ * or `/data/posters` in Docker). The browser path `/generated/posters/YYYYMMDD.jpg` is *not* a folder
+ * under `public/` — it is handled by `app/generated/posters/[file]/route.ts`, which reads files from
+ * this directory only.
+ *
+ * Do **not** keep copies under `public/generated/`: Next may serve those as static files and you will
+ * see stale/wrong posters while the app writes to `data/posters`. Remove `public/generated` if it exists.
+ *
+ * Keeping storage outside `public/` avoids Next scanning a bind-mounted `public/generated` on NAS (EACCES).
  */
 export function getPosterStorageDir(): string {
   const fromEnv = process.env.POSTER_STORAGE_DIR?.trim();

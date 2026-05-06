@@ -51,6 +51,8 @@ model Meeting {
   event_title     String   @default("VierDeVrijdag") @map("event_title") @db.VarChar(255)
   poster_id       Int      @default(1) @map("poster_id")
   poster_rel_path String?  @map("poster_rel_path") @db.VarChar(512)
+  /** Sanitized HTML for public event page (bold, italic, links, lists). */
+  program_description_html String? @map("program_description_html") @db.LongText
   is_template     Boolean  @default(false) @map("is_template")
   created_at      DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updated_at      DateTime @updatedAt @map("updated_at") @db.DateTime(0)
@@ -88,6 +90,8 @@ model ProgramItem {
   slot_start  DateTime @map("slot_start") @db.Time(0)
   slot_end    DateTime @map("slot_end") @db.Time(0)
   description String   @db.Text
+  /** Rich text for public /event block via {{program}} metatag; poster uses `description`. */
+  row_description_html String? @map("row_description_html") @db.LongText
   speakers    String?  @db.VarChar(1024)
   sort_order  Int      @default(0) @map("sort_order")
   created_at  DateTime @default(now()) @map("created_at") @db.DateTime(0)

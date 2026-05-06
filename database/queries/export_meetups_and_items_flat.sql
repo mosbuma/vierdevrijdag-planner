@@ -23,6 +23,7 @@ SELECT
   TIME_FORMAT(pi.slot_start, '%H:%i') AS slot_start,
   TIME_FORMAT(pi.slot_end, '%H:%i') AS slot_end,
   pi.description,
+  pi.row_description_html,
   pi.speakers,
   pi.sort_order AS item_sort_order,
   pi.created_at AS item_created_at,

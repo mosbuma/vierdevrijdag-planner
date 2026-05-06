@@ -38,6 +38,12 @@ mkdir -p data/posters
 npm run dev
 ```
 
+### Poster JPEGs: one folder only
+
+- **On disk:** only **`data/posters/`** (or **`POSTER_STORAGE_DIR`**). Meetup exports are named `YYYYMMDD.jpg`; the DB stores paths like `generated/posters/YYYYMMDD.jpg`.
+- **In the browser:** that same path is a normal URL (`/generated/posters/…`), but it is **not** read from a `public/generated` directory. A **route handler** loads bytes from `data/posters/`.
+- **If you still have `public/generated/`** from an old setup: **delete it** (or at least `public/generated/posters/`). Next can prefer those static files over the route handler, so you may see **out-of-date** posters while the app writes to `data/posters/`.
+
 - Open [http://localhost:3000](http://localhost:3000) (login).
 - Public page: `/event?meet=latest`.
 
@@ -53,9 +59,9 @@ Useful scripts:
 
 Build and run with the same env vars as production. [`docker-compose.yaml`](docker-compose.yaml) uses `network_mode: host` so `DATABASE_URL` can use `localhost:3306` when MariaDB runs on the same NAS.
 
-**Poster files** are stored under **`POSTER_STORAGE_DIR`**. Locally (and in the container) the default is **`./data/posters`** under the project root (`/data/posters` in Docker matches that via the bind-mount), not under `public/generated`. URLs are still `/generated/posters/…`; a route handler serves the JPEGs so Next.js never runs `scandir` on a bind-mounted `public/generated` (which used to crash with **EACCES** on Synology). Compose mounts **`./data/posters:/data/posters`** — create the host dir before first run: `mkdir -p data/posters`.
+**Poster files** live only under **`POSTER_STORAGE_DIR`** (default **`./data/posters`**, in Docker **`/data/posters`** via the bind-mount). URLs stay **`/generated/posters/…`**; a route handler reads from that storage dir—**not** from `public/generated`. Avoid leaving **`public/generated/posters/`** on disk: static files there can **override** the route handler and show stale images. Migrate any old JPEGs into **`data/posters/`** (same filenames), then remove **`public/generated`**. This also avoids Next.js `scandir` on a bad NAS mount under `public/` (**EACCES** on Synology). Compose mounts **`./data/posters:/data/posters`** — create the host dir before first run: `mkdir -p data/posters`.
 
-If you have old files in `public/generated/posters/`, move them to `data/posters/` on the host (same filenames). **`user: "0:0"`** matches marcflix for root-owned NAS mounts; use **`chown -R 1001:1001 data/posters`** and drop `user` if you prefer the Dockerfile `nextjs` user.
+**`user: "0:0"`** matches marcflix for root-owned NAS mounts; use **`chown -R 1001:1001 data/posters`** and drop `user` if you prefer the Dockerfile `nextjs` user.
 
 [`docker-compose.yaml`](docker-compose.yaml) sets **`build.network: host`** (same as marcflix-2025) so **`npm ci` / Prisma** can reach the registry during the image build. On some engines (including older Synology setups) you must turn BuildKit on for that option:
 

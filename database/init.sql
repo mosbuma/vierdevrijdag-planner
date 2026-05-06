@@ -123,6 +123,7 @@ CREATE TABLE `meetings` (
   `event_title` VARCHAR(255) NOT NULL DEFAULT 'VierDeVrijdag',
   `poster_id` INT NOT NULL DEFAULT 1,
   `poster_rel_path` VARCHAR(512) NULL,
+  `program_description_html` LONGTEXT NULL,
   `is_template` TINYINT(1) NOT NULL DEFAULT 0,
   `created_at` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0),
   `updated_at` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0),
@@ -153,6 +154,7 @@ CREATE TABLE `program_items` (
   `slot_start` TIME(0) NOT NULL,
   `slot_end` TIME(0) NOT NULL,
   `description` TEXT NOT NULL,
+  `row_description_html` LONGTEXT NULL,
   `speakers` VARCHAR(1024) NULL,
   `sort_order` INT NOT NULL DEFAULT 0,
   `created_at` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0),
@@ -185,6 +187,7 @@ INSERT INTO `meetings` (
   `event_title`,
   `poster_id`,
   `poster_rel_path`,
+  `program_description_html`,
   `is_template`,
   `created_at`,
   `updated_at`
@@ -196,6 +199,7 @@ INSERT INTO `meetings` (
   'VierDeVrijdag',
   1,
   'generated/posters/20260501.jpg',
+  NULL,
   1,
   '2026-04-28 11:43:04',
   '2026-04-28 14:28:22'
@@ -224,16 +228,17 @@ INSERT INTO `program_items` (
   `slot_start`,
   `slot_end`,
   `description`,
+  `row_description_html`,
   `speakers`,
   `sort_order`,
   `created_at`,
   `updated_at`
 ) VALUES
-  (2, 1, 1, '19:30:00', '19:50:00', 'Tech op de zeepkist', NULL, 2, '2026-04-28 11:43:41', '2026-04-28 13:04:32'),
-  (3, 1, 1, '19:00:00', '19:30:00', 'Inloop', NULL, 1, '2026-04-28 13:03:23', '2026-04-28 13:04:28'),
-  (4, 1, 1, '19:50:00', '20:30:00', 'Mystery Guest #1', NULL, 3, '2026-04-28 13:05:02', '2026-04-28 13:05:02'),
-  (5, 1, 1, '20:30:00', '21:10:00', 'Mystery Guest #2', NULL, 4, '2026-04-28 13:06:01', '2026-04-28 13:06:01'),
-  (6, 1, 1, '21:10:00', '21:45:00', 'Netwerken en borrel', NULL, 5, '2026-04-28 13:06:23', '2026-04-28 13:08:37');
+  (2, 1, 1, '19:30:00', '19:50:00', 'Tech op de zeepkist', NULL, NULL, 2, '2026-04-28 11:43:41', '2026-04-28 13:04:32'),
+  (3, 1, 1, '19:00:00', '19:30:00', 'Inloop', NULL, NULL, 1, '2026-04-28 13:03:23', '2026-04-28 13:04:28'),
+  (4, 1, 1, '19:50:00', '20:30:00', 'Mystery Guest #1', NULL, NULL, 3, '2026-04-28 13:05:02', '2026-04-28 13:05:02'),
+  (5, 1, 1, '20:30:00', '21:10:00', 'Mystery Guest #2', NULL, NULL, 4, '2026-04-28 13:06:01', '2026-04-28 13:06:01'),
+  (6, 1, 1, '21:10:00', '21:45:00', 'Netwerken en borrel', NULL, NULL, 5, '2026-04-28 13:06:23', '2026-04-28 13:08:37');
 
 ALTER TABLE `meetings` AUTO_INCREMENT = 2;
 ALTER TABLE `meeting_tracks` AUTO_INCREMENT = 2;

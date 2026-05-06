@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
+import { sanitizeMeetingDescriptionHtml } from "@/lib/meeting-html";
 import { patchProgramItemSchema } from "@/lib/validators";
 import { parseTimeToDb } from "@/lib/time-db";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
@@ -39,6 +40,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     slot_start?: Date;
     slot_end?: Date;
     description?: string;
+    row_description_html?: string | null;
     speakers?: string | null;
     sort_order?: number;
   } = {};
@@ -46,6 +48,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (parsed.data.slot_start) data.slot_start = parseTimeToDb(parsed.data.slot_start);
   if (parsed.data.slot_end) data.slot_end = parseTimeToDb(parsed.data.slot_end);
   if (parsed.data.description) data.description = parsed.data.description;
+  if (parsed.data.row_description_html !== undefined) {
+    data.row_description_html = sanitizeMeetingDescriptionHtml(parsed.data.row_description_html);
+  }
   if (parsed.data.speakers !== undefined) data.speakers = parsed.data.speakers ?? null;
   if (parsed.data.sort_order !== undefined) data.sort_order = parsed.data.sort_order;
   if (Object.keys(data).length === 0) return jsonError("No fields", 400);

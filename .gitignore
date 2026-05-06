@@ -3,6 +3,7 @@ node_modules
 .env
 .env*.local
 *.log
+# Poster JPEGs: canonical dir is data/posters (POSTER_STORAGE_DIR). Ignore legacy public/generated — do not commit.
 public/generated
 data/posters
 

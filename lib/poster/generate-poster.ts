@@ -218,5 +218,11 @@ export async function writePosterJpeg(
   const svg = buildSvg(sized);
   const overlay = await sharp(Buffer.from(svg, "utf-8")).resize(W, H).png().toBuffer();
   await fs.mkdir(path.dirname(outAbsolutePath), { recursive: true });
-  await sharp(templatePath).composite([{ input: overlay, left: 0, top: 0 }]).jpeg({ quality: 88 }).toFile(outAbsolutePath);
+  // `toFile()` can leave stale trailing bytes on some FS/NAS setups when the new JPEG is
+  // shorter than the old one; `writeFile` truncates and fully replaces the file (same as delete+regen).
+  const jpegBuf = await sharp(templatePath)
+    .composite([{ input: overlay, left: 0, top: 0 }])
+    .jpeg({ quality: 88 })
+    .toBuffer();
+  await fs.writeFile(outAbsolutePath, jpegBuf);
 }

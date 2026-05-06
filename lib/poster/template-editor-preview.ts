@@ -8,7 +8,7 @@ import {
 import { writePosterJpeg, type PosterProgramLine } from "@/lib/poster/generate-poster";
 import { parseStoredPosterRegions } from "@/lib/poster/poster-regions";
 import { posterFileAbsolutePath } from "@/lib/poster/poster-storage-path";
-import { buildPosterProgramLinesFromItems } from "@/lib/poster/sync-poster";
+import { buildPosterProgramLinesFromItems, sortProgramItemsForPoster } from "@/lib/poster/sync-poster";
 
 const DUMMY_PROGRAM_LINES: PosterProgramLine[] = [
   { timeRange: "19:00 – 19:15", description: "Inloop" },
@@ -53,7 +53,8 @@ export async function renderTemplateEditorPreview(posterTemplateId: number, meet
     });
     if (!meeting) throw new Error("Meetup niet gevonden");
     const multiTrack = meeting.tracks.length > 1;
-    programLines = buildPosterProgramLinesFromItems(meeting.items, multiTrack);
+    const ordered = sortProgramItemsForPoster(meeting.items, meeting.tracks);
+    programLines = buildPosterProgramLinesFromItems(ordered, multiTrack);
     eventTitle = meeting.event_title;
     meetupDate = meeting.meetup_date;
     venueLine = meeting.venue_line;

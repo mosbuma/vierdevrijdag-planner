@@ -10,6 +10,8 @@ export const patchMeetingSchema = z.object({
   venue_line: z.string().min(1).max(512).optional(),
   event_title: z.string().min(1).max(255).optional(),
   poster_id: z.number().int().positive().optional(),
+  /** HTML from TipTap; stored only after sanitization on the server. */
+  program_description_html: z.union([z.string().max(200_000), z.null()]).optional(),
 });
 
 /** `meetingId` −1 = dummy meetup; else a real `meetings.id`. */
@@ -31,6 +33,8 @@ export const createProgramItemSchema = z.object({
   slot_start: hhmm,
   slot_end: hhmm,
   description: z.string().min(1),
+  /** TipTap HTML; stored after server sanitization. */
+  row_description_html: z.union([z.string().max(50_000), z.null()]).optional(),
   speakers: z.string().max(1024).optional().nullable(),
   sort_order: z.number().int().optional(),
 });

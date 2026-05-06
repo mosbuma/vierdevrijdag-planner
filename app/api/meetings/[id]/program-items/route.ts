@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/auth";
 import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
+import { sanitizeMeetingDescriptionHtml } from "@/lib/meeting-html";
 import { createProgramItemSchema } from "@/lib/validators";
 import { parseTimeToDb } from "@/lib/time-db";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
@@ -35,6 +36,10 @@ export async function POST(req: Request, ctx: Ctx) {
     _max: { sort_order: true },
   });
   const sortOrder = parsed.data.sort_order ?? (maxSort._max.sort_order ?? -1) + 1;
+  const rowHtml =
+    parsed.data.row_description_html !== undefined
+      ? sanitizeMeetingDescriptionHtml(parsed.data.row_description_html)
+      : null;
   try {
     const item = await prisma.programItem.create({
       data: {
@@ -43,6 +48,7 @@ export async function POST(req: Request, ctx: Ctx) {
         slot_start: parseTimeToDb(parsed.data.slot_start),
         slot_end: parseTimeToDb(parsed.data.slot_end),
         description: parsed.data.description,
+        row_description_html: rowHtml,
         speakers: parsed.data.speakers ?? null,
         sort_order: sortOrder,
       },

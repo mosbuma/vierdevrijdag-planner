@@ -1,3 +1,6 @@
+/**
+ * Serves `/generated/posters/*.jpg` from `POSTER_STORAGE_DIR` (default `data/posters/`), not from `public/`.
+ */
 import fs from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { dateFromYmd } from "@/lib/date-parse";
