@@ -1,5 +1,5 @@
 import { getNostrEventHashtags } from "@/lib/nostr/config";
 
-export function getEventHashtags(): string[] {
+export async function getEventHashtags(): Promise<string[]> {
   return getNostrEventHashtags();
 }

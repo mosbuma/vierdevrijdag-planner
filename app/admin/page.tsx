@@ -2,12 +2,14 @@ import Link from "next/link";
 import { CreateStandardMeetupButton } from "@/components/CreateStandardMeetupButton";
 import { NostrAdminPanel } from "@/components/NostrAdminPanel";
 import { getAuthContext } from "@/lib/auth";
+import { getNip05Identifier } from "@/lib/nostr/nip05";
 import { prisma } from "@/lib/prisma";
 import { amsterdamTodayYmd, isMeetingPublicVisible, toAmsterdamYmd } from "@/lib/dates";
 
 export default async function AdminHomePage() {
   const ctx = await getAuthContext();
   const todayYmd = amsterdamTodayYmd();
+  const nip05Id = ctx?.isAdmin ? await getNip05Identifier().catch(() => null) : null;
   const meetings = await prisma.meeting.findMany({
     orderBy: { meetup_date: "desc" },
     include: { _count: { select: { items: true } } },
@@ -22,7 +24,7 @@ export default async function AdminHomePage() {
         </div>
         <CreateStandardMeetupButton />
       </div>
-      {ctx?.isAdmin ? <NostrAdminPanel /> : null}
+      {ctx?.isAdmin ? <NostrAdminPanel nip05Id={nip05Id} /> : null}
       <table className="mt-6">
         <thead>
           <tr>

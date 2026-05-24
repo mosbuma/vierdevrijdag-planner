@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 
-export function NostrAdminPanel() {
+type Props = {
+  nip05Id: string | null;
+};
+
+export function NostrAdminPanel({ nip05Id }: Props) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [republishLoading, setRepublishLoading] = useState(false);
   const [profileMsg, setProfileMsg] = useState<string | null>(null);
@@ -64,8 +68,13 @@ export function NostrAdminPanel() {
     <div className="mt-4 rounded border border-slate-700 bg-slate-900/40 p-4">
       <h2 className="text-sm font-semibold text-white">Nostr</h2>
       <p className="mt-1 text-sm text-slate-400">
-        Profiel (kind:0) met NIP-05 <code className="text-teal-300">meetup@vierdevrijdag.org</code> en meetup-events
-        (kind:31923) op relays.
+        Profiel (kind:0) met NIP-05{" "}
+        {nip05Id ? (
+          <code className="text-teal-300">{nip05Id}</code>
+        ) : (
+          <span className="text-amber-300">(niet geconfigureerd)</span>
+        )}{" "}
+        en meetup-events (kind:31923) op relays.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-3">

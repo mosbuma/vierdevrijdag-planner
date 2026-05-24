@@ -9,7 +9,6 @@
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint .",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:ping": "echo 'SELECT 1 AS ok;' | prisma db execute --stdin",
     "nostr:keygen": "node scripts/nostr-keygen.mjs",

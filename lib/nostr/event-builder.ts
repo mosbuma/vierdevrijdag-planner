@@ -7,6 +7,28 @@ export const NOSTR_KIND = {
   CALENDAR: 31924,
 } as const;
 
+export type AppNostrKind = (typeof NOSTR_KIND)[keyof typeof NOSTR_KIND];
+
+export const APP_NOSTR_KIND_FILTERS: ReadonlyArray<{
+  kind: AppNostrKind;
+  label: string;
+  defaultEnabled: boolean;
+}> = [
+  { kind: NOSTR_KIND.TIME_BASED_CALENDAR_EVENT, label: "Kalender-events", defaultEnabled: true },
+  { kind: NOSTR_KIND.CALENDAR, label: "Kalender-collectie", defaultEnabled: true },
+  { kind: NOSTR_KIND.METADATA, label: "Profiel", defaultEnabled: false },
+  { kind: NOSTR_KIND.DELETION, label: "Verwijderverzoeken", defaultEnabled: false },
+];
+
+const APP_NOSTR_KINDS = new Set<number>(APP_NOSTR_KIND_FILTERS.map((f) => f.kind));
+
+/** Kinds fetched from relays for this app (profile, calendar, deletions). */
+export const APP_NOSTR_KIND_LIST: AppNostrKind[] = APP_NOSTR_KIND_FILTERS.map((f) => f.kind);
+
+export function isAppNostrKind(kind: number): kind is AppNostrKind {
+  return APP_NOSTR_KINDS.has(kind);
+}
+
 export type NostrTag = string[];
 
 export type UnsignedNostrEvent = {

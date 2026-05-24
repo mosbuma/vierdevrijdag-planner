@@ -126,7 +126,8 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       changes: { deleted: true },
     });
     return new NextResponse(null, { status: 204 });
-  } catch {
-    return jsonError("Not found", 404);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Verwijderen mislukt";
+    return jsonError(msg, 502);
   }
 }

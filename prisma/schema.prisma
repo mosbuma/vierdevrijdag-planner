@@ -122,3 +122,28 @@ model AuditLog {
   @@index([username])
   @@map("audit_logs")
 }
+
+/** Singleton (id=1): Nostr profile, relays, calendar and event defaults (editable via Instellingen). */
+model NostrSettings {
+  id                            Int      @id @default(1)
+  relays                        String   @db.Text
+  nip05_domain                  String   @map("nip05_domain") @db.VarChar(255)
+  content_site_origin           String   @default("https://vierdevrijdag.org") @map("content_site_origin") @db.VarChar(512)
+  profile_name                  String   @map("profile_name") @db.VarChar(64)
+  profile_display_name          String   @map("profile_display_name") @db.VarChar(128)
+  profile_picture_url           String?  @map("profile_picture_url") @db.VarChar(512)
+  profile_about                 String   @map("profile_about") @db.Text
+  event_hashtags                String   @default("") @map("event_hashtags") @db.VarChar(512)
+  event_d_tag_prefix            String   @map("event_d_tag_prefix") @db.VarChar(64)
+  calendar_collection_d_tag     String   @map("calendar_collection_d_tag") @db.VarChar(128)
+  calendar_collection_title     String   @map("calendar_collection_title") @db.VarChar(255)
+  calendar_collection_description String @map("calendar_collection_description") @db.Text
+  timezone                      String   @db.VarChar(64)
+  meetup_default_start          String   @map("meetup_default_start") @db.VarChar(5)
+  meetup_default_end            String   @map("meetup_default_end") @db.VarChar(5)
+  deletion_reason               String   @map("deletion_reason") @db.VarChar(512)
+  created_at                    DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updated_at                    DateTime @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("nostr_settings")
+}

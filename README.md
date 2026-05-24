@@ -17,11 +17,18 @@ Next.js app to manage meetup programs (timeslots, speakers, visibility) and publ
      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
    ```
 
-2. Run [`database/init.sql`](database/init.sql) against it (tables + seed admin row; password documented in that script).
+2. **Existing database** (already running this app): after schema changes in git, run:
 
-3. Grant your app user privileges on `vierdevrijdag` only (see phpMyAdmin user host vs. where the app connects from).
+   ```bash
+   npx prisma generate
+   npx prisma db push
+   ```
 
-4. `DATABASE_URL` example:
+3. **Fresh empty database**: run [`database/init.sql`](database/init.sql) (tables, seed admin, template meetup — **drops existing tables**). See [`database/README.md`](database/README.md).
+
+4. Grant your app user privileges on `vierdevrijdag` only (see phpMyAdmin user host vs. where the app connects from).
+
+5. `DATABASE_URL` example:
 
    ```text
    mysql://USER:PASSWORD@HOST:3306/vierdevrijdag
@@ -38,6 +45,8 @@ mkdir -p data/posters
 npm run dev
 ```
 
+After pulling DB schema changes: `npx prisma generate && npx prisma db push`.
+
 ### Poster JPEGs: one folder only
 
 - **On disk:** only **`data/posters/`** (or **`POSTER_STORAGE_DIR`**). Meetup exports are named `YYYYMMDD.jpg`; the DB stores paths like `generated/posters/YYYYMMDD.jpg`.
@@ -52,7 +61,10 @@ Useful scripts:
 | Script        | Purpose                          |
 |---------------|----------------------------------|
 | `npm run db:ping` | `SELECT 1` via Prisma CLI   |
+| `npm run db:push` | Sync schema to database (Prisma) |
 | `npm run db:studio` | Prisma Studio             |
+| `npm run nostr:keygen` | Generate NOSTR_NPUB/NSEC |
+| `npm run nostr:backfill` | Publish meetups missing Nostr fields |
 | `npm run build` / `npm start` | Production build        |
 
 ## Docker (e.g. Synology NAS)
@@ -85,32 +97,30 @@ Point your reverse proxy at `PORT` (see `Dockerfile` / compose; default in READM
 
 ## Nostr (NIP-05 + NIP-52)
 
-The site can publish meetups as NIP-52 calendar events (`kind:31923`) from a server-held key, with NIP-05 identity **`meetup@<domain>`** (see `NOSTR_NIP05_DOMAIN` below).
+The site can publish meetups as NIP-52 calendar events (`kind:31923`) from a server-held key, with NIP-05 identity **`meetup@<domain>`** (configured under **Instellingen** in admin).
 
-### Environment variables
-
-All Nostr settings are **required** for publishing (no code defaults). Copy the block from [`.env.example`](.env.example).
+### Secrets (.env)
 
 | Variable | Purpose |
 |----------|---------|
 | `NOSTR_NPUB` | Public key for `/.well-known/nostr.json` and display. |
 | `NOSTR_NSEC` | Server signing key. Never commit. Must match `NOSTR_NPUB` if both are set. |
-| `NOSTR_RELAYS` | Comma-separated `wss://` relay URLs (at least one). |
 | `NOSTR_CRON_TOKEN` | Bearer secret for `/api/nostr/cron/*` and `npm run nostr:backfill`. |
-| `NOSTR_NIP05_DOMAIN` | Domain for NIP-05 (`meetup@domain`). |
-| `NOSTR_PROFILE_NAME` | NIP-05 local name (e.g. `meetup`). |
-| `NOSTR_PROFILE_DISPLAY_NAME` | kind:0 display name. |
-| `NOSTR_PROFILE_ABOUT` | kind:0 bio text. |
-| `NOSTR_PROFILE_PICTURE_URL` | Optional avatar URL on kind:0 profile. |
-| `NOSTR_EVENT_HASHTAGS` | Comma-separated `t` tags on meetup events. Use empty string for none. |
-| `NOSTR_EVENT_D_TAG_PREFIX` | Prefix for per-meetup `d` tags (e.g. `vierdevrijdag` → `vierdevrijdag-20260626`). |
-| `NOSTR_CALENDAR_COLLECTION_D_TAG` | `d` tag for the kind:31924 collection. |
-| `NOSTR_CALENDAR_COLLECTION_TITLE` | Title on the kind:31924 collection. |
-| `NOSTR_CALENDAR_COLLECTION_DESCRIPTION` | Content on the kind:31924 collection. |
-| `NOSTR_TIMEZONE` | IANA timezone for event times (e.g. `Europe/Amsterdam`). |
-| `NOSTR_MEETUP_DEFAULT_START` | Fallback start time (`HH:mm`) when a meetup has no program slots. |
-| `NOSTR_MEETUP_DEFAULT_END` | Fallback end time (`HH:mm`) when a meetup has no program slots. |
-| `NOSTR_DELETION_REASON` | Text on kind:5 deletion requests. |
+
+### Instellingen (database)
+
+Profile, relays, hashtags, calendar collection, timezone, and related Nostr options are stored in **`nostr_settings`** and edited at **`/admin/settings`** (admin only). If the table is empty, defaults from [`lib/nostr/settings-bootstrap.ts`](lib/nostr/settings-bootstrap.ts) are inserted automatically.
+
+| Field (UI) | Purpose |
+|------------|---------|
+| Relays | Comma-separated `wss://` relay URLs |
+| NIP-05 domain / profiel | `meetup@domain` identity and kind:0 profile |
+| Publieke site-URL | Event and poster links **inside published Nostr events** (independent of `NEXTAUTH_URL`) |
+| Meetup defaults | d-tag prefix, hashtags, timezone, fallback times |
+| Kalender-collectie | kind:31924 collection metadata |
+| Verwijdering | Text on kind:5 deletion requests |
+
+**NOSTR Sleutels** (Instellingen tab) shows `npub`, hex pubkey, and NIP-05 preview from `.env` only.
 
 ### Setup
 
@@ -130,9 +140,9 @@ All Nostr settings are **required** for publishing (no code defaults). Copy the 
 
    Set `NOSTR_CRON_TOKEN` in `.env`. Used by cron, backfill, and `npm run nostr:backfill`.
 
-3. Set every variable in the Nostr block in `.env` (see `.env.example`). Missing values cause publish/NIP-05 operations to fail with a clear error.
+3. Ensure DB schema is current (`npx prisma db push` if needed).
 
-4. Apply DB columns (new installs: [`database/init.sql`](database/init.sql); existing DB: [`database/migrations/20260523_nostr_publication_fields.sql`](database/migrations/20260523_nostr_publication_fields.sql) or `npx prisma db push`).
+4. Open **Instellingen** (admin) to review or adjust Nostr settings (defaults are bootstrapped when the table is empty).
 
 5. Verify NIP-05 (after deploy):
 
@@ -149,13 +159,28 @@ All Nostr settings are **required** for publishing (no code defaults). Copy the 
      https://vierdevrijdag.org/api/admin/nostr/publish-profile
    ```
 
-   Or use **Publiceer profiel** / **Alle meetups opnieuw publiceren** on the admin Meetups page (admin only). Re-run after changing profile env vars or `NOSTR_NIP05_DOMAIN`.
+   Or use **Publiceer profiel** / **Alle meetups opnieuw publiceren** on the admin Meetups page (admin only). Re-run after changing profile or NIP-05 settings in **Instellingen**.
+
+### Local dev vs production
+
+| Concern | Localhost | Production |
+|---------|-----------|------------|
+| Publish to relays | Yes (`npm run dev`, keys in `.env`) | Yes |
+| NIP-05 verification | Use production (`vierdevrijdag.org`) | `/.well-known/nostr.json` |
+| Links in Nostr events | **Instellingen → Publieke site-URL** (default `https://vierdevrijdag.org`) | Same |
+| Auth / site pages | `NEXTAUTH_URL=http://localhost:3000` | Public HTTPS URL |
+
+You can publish meetups and test relay delivery from localhost. Set **NIP-05 domein** to `vierdevrijdag.org` so profile and verification stay on production while you publish from localhost.
 
 ### Publishing meetups
 
 - In the meetup editor: **Publiceren op Nostr** (disabled until `visible_from` is today or earlier).
 - After the first publish, edits to the meetup or program auto-republish when saved.
-- Deleting a meetup (admin) sends a Nostr deletion request (`kind:5`).
+- **Meetup verwijderen** (admin, meetup editor): publishes kind:5 deletion request(s) to relays for that meetup’s calendar event(s), updates the kind:31924 collection, then removes the row from the database. Relay lookup uses the stored event id and the meetup d-tag (e.g. `vierdevrijdag-20260522`), so republished orphans are removed too. If Nostr deletion fails on all relays, the meetup **stays in the database** and the editor shows an error.
+
+### Nostr events viewer (`/nostr`)
+
+Lists **all events** published by the server `npub` (`NOSTR_NPUB` / derived from `NOSTR_NSEC`), fetched from configured relays. Filter by kind, open **Preview** or **Raw** (profile and calendar events have structured previews). **Vernieuwen** re-fetches from relays. Admins can delete individual events or use **Verwijder alles** on the admin Meetups page flow; meetup delete is integrated as above.
 
 ### Cron (auto-publish newly visible meetups)
 

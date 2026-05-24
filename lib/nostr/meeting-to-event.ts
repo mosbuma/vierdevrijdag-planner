@@ -1,6 +1,6 @@
 import type { Meeting, MeetingTrack, ProgramItem } from "@prisma/client";
 import { formatDutchLongDate, toAmsterdamYmd, toMeetParamYmd } from "@/lib/dates";
-import { getPublicSiteOrigin } from "@/lib/public-site-url";
+import { getNostrContentSiteOrigin } from "@/lib/nostr/config";
 import { localDateTimeToUnix } from "@/lib/nostr/local-unix";
 import type { TimeBasedCalendarEventInput } from "@/lib/nostr/event-builder";
 import {
@@ -21,22 +21,26 @@ import { formatTimeFromDb } from "@/lib/poster/generate-poster";
 
 type ItemWithTrack = ProgramItem & { track: MeetingTrack };
 
-export function meetingDTag(meetupDate: Date): string {
+export async function meetingDTag(meetupDate: Date): Promise<string> {
   const ymd = toAmsterdamYmd(meetupDate).replace(/-/g, "");
-  return `${getNostrEventDTagPrefix()}-${ymd}`;
+  const prefix = await getNostrEventDTagPrefix();
+  return `${prefix}-${ymd}`;
 }
 
-export function calendarCollectionDTag(): string {
+export async function calendarCollectionDTag(): Promise<string> {
   return getNostrCalendarCollectionDTag();
 }
 
-export function calendarCollectionTitle(): string {
+export async function calendarCollectionTitle(): Promise<string> {
   return getNostrCalendarCollectionTitle();
 }
 
-function slotTimesFromItems(items: ItemWithTrack[]): { start: string; end: string } {
+async function slotTimesFromItems(items: ItemWithTrack[]): Promise<{ start: string; end: string }> {
   if (items.length === 0) {
-    return { start: getNostrMeetupDefaultStart(), end: getNostrMeetupDefaultEnd() };
+    return {
+      start: await getNostrMeetupDefaultStart(),
+      end: await getNostrMeetupDefaultEnd(),
+    };
   }
   let minStart = 24 * 60;
   let maxEnd = 0;
@@ -96,24 +100,25 @@ function buildPlainDescription(
   return lines.join("\n");
 }
 
-export function meetingToCalendarEventInput(
+export async function meetingToCalendarEventInput(
   meeting: Meeting,
   items: ItemWithTrack[],
   tracks: MeetingTrack[],
-): TimeBasedCalendarEventInput {
-  const timezone = getNostrTimezone();
+): Promise<TimeBasedCalendarEventInput> {
+  const timezone = await getNostrTimezone();
   const ymd = toAmsterdamYmd(meeting.meetup_date);
-  const { start, end } = slotTimesFromItems(items);
+  const { start, end } = await slotTimesFromItems(items);
   const startUnix = localDateTimeToUnix(ymd, start, timezone);
   const endUnix = localDateTimeToUnix(ymd, end, timezone);
   const meetParam = toMeetParamYmd(meeting.meetup_date);
-  const eventUrl = `${getPublicSiteOrigin()}/event?meet=${meetParam}`;
+  const siteOrigin = await getNostrContentSiteOrigin();
+  const eventUrl = `${siteOrigin}/event?meet=${meetParam}`;
   const posterUrl = meeting.poster_rel_path
-    ? `${getPublicSiteOrigin()}/${meeting.poster_rel_path.replace(/^\//, "")}`
+    ? `${siteOrigin}/${meeting.poster_rel_path.replace(/^\//, "")}`
     : undefined;
 
   return {
-    identifier: meetingDTag(meeting.meetup_date),
+    identifier: await meetingDTag(meeting.meetup_date),
     title: meeting.event_title,
     summary: summaryFromHtml(meeting.program_description_html),
     description: buildPlainDescription(meeting, items, tracks, eventUrl),
@@ -122,6 +127,6 @@ export function meetingToCalendarEventInput(
     timezone,
     location: meeting.venue_line,
     image: posterUrl,
-    hashtags: getEventHashtags(),
+    hashtags: await getEventHashtags(),
   };
 }

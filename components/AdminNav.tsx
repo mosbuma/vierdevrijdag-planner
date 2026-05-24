@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignOutButton } from "@/components/SignOutButton";
+import { AdminNavLink } from "@/components/AdminNavLink";
 
 export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
   return (
@@ -19,13 +20,20 @@ export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
             <Link href="/admin/audit" className="text-teal-400 no-underline hover:underline">
               Auditlog
             </Link>
+            <Link href="/admin/settings" className="text-teal-400 no-underline hover:underline">
+              Instellingen
+            </Link>
           </>
         )}
+        <AdminNavLink
+          href="/nostr"
+          className="text-slate-400 no-underline hover:underline"
+          showPendingSpinner
+        >
+          Nostr
+        </AdminNavLink>
         <Link href="/event?meet=latest" className="text-slate-400 no-underline hover:underline">
           Publieke pagina
-        </Link>
-        <Link href="/nostr" className="text-slate-400 no-underline hover:underline">
-          Nostr
         </Link>
       </nav>
       <SignOutButton />

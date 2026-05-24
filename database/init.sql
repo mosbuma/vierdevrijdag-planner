@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS `meeting_tracks`;
 DROP TABLE IF EXISTS `meetings`;
 DROP TABLE IF EXISTS `posters`;
 DROP TABLE IF EXISTS `audit_logs`;
+DROP TABLE IF EXISTS `nostr_settings`;
 DROP TABLE IF EXISTS `users`;
 
 SET FOREIGN_KEY_CHECKS = 1;
@@ -247,3 +248,26 @@ INSERT INTO `program_items` (
 ALTER TABLE `meetings` AUTO_INCREMENT = 2;
 ALTER TABLE `meeting_tracks` AUTO_INCREMENT = 2;
 ALTER TABLE `program_items` AUTO_INCREMENT = 7;
+
+CREATE TABLE `nostr_settings` (
+  `id` INT NOT NULL DEFAULT 1,
+  `relays` TEXT NOT NULL,
+  `nip05_domain` VARCHAR(255) NOT NULL,
+  `content_site_origin` VARCHAR(512) NOT NULL DEFAULT 'https://vierdevrijdag.org',
+  `profile_name` VARCHAR(64) NOT NULL,
+  `profile_display_name` VARCHAR(128) NOT NULL,
+  `profile_picture_url` VARCHAR(512) NULL,
+  `profile_about` TEXT NOT NULL,
+  `event_hashtags` VARCHAR(512) NOT NULL DEFAULT '',
+  `event_d_tag_prefix` VARCHAR(64) NOT NULL,
+  `calendar_collection_d_tag` VARCHAR(128) NOT NULL,
+  `calendar_collection_title` VARCHAR(255) NOT NULL,
+  `calendar_collection_description` TEXT NOT NULL,
+  `timezone` VARCHAR(64) NOT NULL,
+  `meetup_default_start` VARCHAR(5) NOT NULL,
+  `meetup_default_end` VARCHAR(5) NOT NULL,
+  `deletion_reason` VARCHAR(512) NOT NULL,
+  `created_at` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0),
+  `updated_at` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -1,5 +1,5 @@
 import { getNostrRelays } from "@/lib/nostr/config";
 
-export function getRelays(): string[] {
+export async function getRelays(): Promise<string[]> {
   return getNostrRelays();
 }

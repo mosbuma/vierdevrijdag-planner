@@ -4,19 +4,23 @@ import { tryLoadServerPubkey } from "@/lib/nostr/keys";
 
 export { getNip05Domain, getNip05Identifier };
 
-export function getNip05ProfileName(): string {
+export async function getNip05ProfileName(): Promise<string> {
   return getNostrProfileName();
 }
 
-export function buildNip05Json(): { names: Record<string, string>; relays: Record<string, string[]> } | null {
+export async function buildNip05Json(): Promise<{
+  names: Record<string, string>;
+  relays: Record<string, string[]>;
+} | null> {
   const key = tryLoadServerPubkey();
   if (!key) return null;
 
   try {
-    const name = getNostrProfileName();
+    const name = await getNostrProfileName();
+    const relays = await getRelays();
     return {
       names: { [name]: key.pkHex },
-      relays: { [key.pkHex]: getRelays() },
+      relays: { [key.pkHex]: relays },
     };
   } catch {
     return null;

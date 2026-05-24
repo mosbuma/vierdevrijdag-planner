@@ -4,6 +4,7 @@ import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { patchMeetingTrackSchema } from "@/lib/validators";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
+import { republishIfDirty } from "@/lib/nostr/publisher";
 import { writeAuditLog } from "@/lib/audit-log";
 
 type Ctx = { params: Promise<{ id: string; trackId: string }> };
@@ -37,6 +38,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     data,
   });
   await syncPosterForMeeting(meetingId);
+  await republishIfDirty(meetingId);
   await writeAuditLog({
     username: auth.username,
     action: "meetings.tracks.PATCH",
@@ -62,6 +64,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (count <= 1) return jsonError("Minimaal één track vereist", 400);
   await prisma.meetingTrack.delete({ where: { id: tid } });
   await syncPosterForMeeting(meetingId);
+  await republishIfDirty(meetingId);
   await writeAuditLog({
     username: auth.username,
     action: "meetings.tracks.DELETE",

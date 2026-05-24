@@ -27,13 +27,17 @@ import {
   meetingDTag,
   meetingToCalendarEventInput,
 } from "@/lib/nostr/meeting-to-event";
-import { dTagFromEventTags, fetchAuthorEventsFromRelays } from "@/lib/nostr/fetch-author-events";
+import {
+  dTagFromEventTags,
+  fetchAuthorEventsFromRelays,
+  findAuthorCalendarEventsByDTag,
+} from "@/lib/nostr/fetch-author-events";
 import { getNip05Identifier } from "@/lib/nostr/nip05";
 
 const PUBLISH_TIMEOUT_MS = 8000;
 
-function collectionRelayHint(): string {
-  const relays = getRelays();
+async function collectionRelayHint(): Promise<string> {
+  const relays = await getRelays();
   const first = relays[0];
   if (!first) {
     throw new Error("NOSTR_RELAYS must contain at least one relay");
@@ -58,7 +62,7 @@ function toEventTemplate(unsigned: UnsignedNostrEvent): EventTemplate {
 
 async function publishUnsigned(unsigned: UnsignedNostrEvent): Promise<PublishResult> {
   const { skBytes } = loadServerKey();
-  const relays = getRelays();
+  const relays = await getRelays();
   const signed = finalizeEvent(toEventTemplate(unsigned), skBytes);
   const pool = new SimplePool();
 
@@ -129,14 +133,15 @@ async function publishCalendarCollection(pkHex: string): Promise<PublishResult |
   const upcoming = rows.filter((m) => toAmsterdamYmd(m.meetup_date) >= today);
   if (upcoming.length === 0) return null;
 
+  const relayHint = await collectionRelayHint();
   const unsigned = buildCalendarCollection({
-    identifier: calendarCollectionDTag(),
-    title: calendarCollectionTitle(),
-    description: getNostrCalendarCollectionDescription(),
+    identifier: await calendarCollectionDTag(),
+    title: await calendarCollectionTitle(),
+    description: await getNostrCalendarCollectionDescription(),
     authorPubkey: pkHex,
     eventRefs: upcoming.map((m) => ({
       dTag: m.nostr_d_tag!,
-      relayHint: collectionRelayHint(),
+      relayHint,
     })),
   });
   return publishUnsigned(unsigned);
@@ -145,15 +150,62 @@ async function publishCalendarCollection(pkHex: string): Promise<PublishResult |
 export async function publishProfile(): Promise<PublishResult> {
   const { pkHex } = loadServerKey();
   const unsigned = buildProfileEvent({
-    name: getNostrProfileName(),
-    displayName: getNostrProfileDisplayName(),
-    about: getNostrProfileAbout(),
-    picture: getNostrProfilePictureUrl(),
-    nip05: getNip05Identifier(),
+    name: await getNostrProfileName(),
+    displayName: await getNostrProfileDisplayName(),
+    about: await getNostrProfileAbout(),
+    picture: await getNostrProfilePictureUrl(),
+    nip05: await getNip05Identifier(),
   });
   const result = await publishUnsigned(unsigned);
   void pkHex;
   return result;
+}
+
+function collectMeetupEventIds(
+  onRelays: { id: string }[],
+  extraIds?: Iterable<string | null | undefined>,
+): string[] {
+  const eventIds = new Set<string>();
+  for (const id of extraIds ?? []) {
+    if (id) eventIds.add(id);
+  }
+  for (const ev of onRelays) {
+    eventIds.add(ev.id);
+  }
+  return [...eventIds];
+}
+
+async function deleteSupersededMeetupEvents(opts: {
+  pkHex: string;
+  dTag: string;
+  keepEventId: string;
+  previousEventId?: string | null;
+}): Promise<{ attempted: number; succeeded: number; lastError: string | null }> {
+  const onRelays = await findAuthorCalendarEventsByDTag(opts.pkHex, opts.dTag);
+  const toDelete = collectMeetupEventIds(onRelays, [opts.previousEventId]).filter(
+    (id) => id !== opts.keepEventId,
+  );
+  if (toDelete.length === 0) {
+    return { attempted: 0, succeeded: 0, lastError: null };
+  }
+
+  let succeeded = 0;
+  let lastError: string | null = null;
+  for (const eventId of toDelete) {
+    try {
+      await requestEventDeletion({
+        eventId,
+        kind: NOSTR_KIND.TIME_BASED_CALENDAR_EVENT,
+        dTag: opts.dTag,
+        updateCollection: false,
+        clearMeetingRecord: false,
+      });
+      succeeded++;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : "Delete failed";
+    }
+  }
+  return { attempted: toDelete.length, succeeded, lastError };
 }
 
 export async function publishMeeting(
@@ -165,8 +217,9 @@ export async function publishMeeting(
   assertMeetingPublishable(meeting);
 
   const { pkHex } = loadServerKey();
-  const dTag = meetingDTag(meeting.meetup_date);
-  const input = meetingToCalendarEventInput(meeting, meeting.items, meeting.tracks);
+  const dTag = await meetingDTag(meeting.meetup_date);
+  const previousEventId = meeting.nostr_event_id;
+  const input = await meetingToCalendarEventInput(meeting, meeting.items, meeting.tracks);
   const unsigned = buildTimeBasedCalendarEvent(input);
   const result = await publishUnsigned(unsigned);
 
@@ -180,19 +233,60 @@ export async function publishMeeting(
     },
   });
 
+  let cleanupWarning: string | null = null;
+  try {
+    const cleanup = await deleteSupersededMeetupEvents({
+      pkHex,
+      dTag,
+      keepEventId: result.id,
+      previousEventId,
+    });
+    if (cleanup.attempted > 0 && cleanup.succeeded < cleanup.attempted) {
+      cleanupWarning = `Orphan cleanup: ${cleanup.succeeded}/${cleanup.attempted}${
+        cleanup.lastError ? ` (${cleanup.lastError})` : ""
+      }`;
+    }
+  } catch (e) {
+    cleanupWarning = e instanceof Error ? e.message : "Orphan cleanup failed";
+  }
+
   if (!opts?.skipCalendarCollection) {
     try {
       await publishCalendarCollection(pkHex);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Collection publish failed";
+      const collectionMsg = e instanceof Error ? e.message : "Collection publish failed";
+      const errorMsg = cleanupWarning
+        ? `Event OK; ${cleanupWarning}; collection: ${collectionMsg}`
+        : `Event OK; collection: ${collectionMsg}`;
       await prisma.meeting.update({
         where: { id: meetingId },
-        data: { nostr_last_error: `Event OK; collection: ${msg}`.slice(0, 1024) },
+        data: { nostr_last_error: errorMsg.slice(0, 1024) },
       });
+      return result;
     }
   }
 
+  if (cleanupWarning) {
+    await prisma.meeting.update({
+      where: { id: meetingId },
+      data: { nostr_last_error: `Event OK; ${cleanupWarning}`.slice(0, 1024) },
+    });
+  }
+
   return result;
+}
+
+function meetingChangedSinceNostrPublish(
+  meeting: {
+    updated_at: Date;
+    tracks: { updated_at: Date }[];
+    items: { updated_at: Date }[];
+  },
+  publishedAt: number,
+): boolean {
+  if (meeting.updated_at.getTime() > publishedAt) return true;
+  if (meeting.tracks.some((t) => t.updated_at.getTime() > publishedAt)) return true;
+  return meeting.items.some((it) => it.updated_at.getTime() > publishedAt);
 }
 
 export async function isMeetingDirtyForNostr(meetingId: number): Promise<boolean> {
@@ -202,13 +296,12 @@ export async function isMeetingDirtyForNostr(meetingId: number): Promise<boolean
       nostr_event_id: true,
       nostr_published_at: true,
       updated_at: true,
+      tracks: { select: { updated_at: true } },
       items: { select: { updated_at: true } },
     },
   });
   if (!meeting?.nostr_event_id || !meeting.nostr_published_at) return false;
-  const publishedAt = meeting.nostr_published_at.getTime();
-  if (meeting.updated_at.getTime() > publishedAt) return true;
-  return meeting.items.some((it) => it.updated_at.getTime() > publishedAt);
+  return meetingChangedSinceNostrPublish(meeting, meeting.nostr_published_at.getTime());
 }
 
 export async function republishIfDirty(meetingId: number): Promise<PublishResult | null> {
@@ -234,6 +327,8 @@ export async function requestEventDeletion(opts: {
   dTag?: string | null;
   /** Republish calendar collection after deleting a meetup event. Default true. */
   updateCollection?: boolean;
+  /** Clear nostr_* fields on the linked meeting row. Default true. */
+  clearMeetingRecord?: boolean;
 }): Promise<PublishResult> {
   const { pkHex } = loadServerKey();
   const unsigned = buildDeletionRequest({
@@ -241,7 +336,7 @@ export async function requestEventDeletion(opts: {
     kind: opts.kind,
     pubkey: pkHex,
     dTag: opts.dTag,
-    reason: getNostrDeletionReason(),
+    reason: await getNostrDeletionReason(),
   });
   const result = await publishUnsigned(unsigned);
 
@@ -249,7 +344,7 @@ export async function requestEventDeletion(opts: {
     where: { nostr_event_id: opts.eventId },
     select: { id: true },
   });
-  if (meeting) {
+  if (meeting && opts.clearMeetingRecord !== false) {
     await prisma.meeting.update({
       where: { id: meeting.id },
       data: {
@@ -315,21 +410,55 @@ export async function requestAllEventsDeletion(): Promise<{
 
 export async function deleteMeetingFromNostr(meetingId: number): Promise<void> {
   const meeting = await prisma.meeting.findUnique({ where: { id: meetingId } });
-  if (!meeting?.nostr_event_id || !meeting.nostr_d_tag) return;
+  if (!meeting) return;
+
+  const wasPublished = Boolean(meeting.nostr_event_id || meeting.nostr_published_at);
+  if (!wasPublished) return;
 
   const { pkHex } = loadServerKey();
-  const unsigned = buildDeletionRequest({
-    eventId: meeting.nostr_event_id,
-    kind: NOSTR_KIND.TIME_BASED_CALENDAR_EVENT,
-    pubkey: pkHex,
-    dTag: meeting.nostr_d_tag,
-    reason: getNostrDeletionReason(),
-  });
+  const dTag = meeting.nostr_d_tag ?? (await meetingDTag(meeting.meetup_date));
 
-  try {
-    await publishUnsigned(unsigned);
-  } catch {
-    /* best-effort */
+  const onRelays = await findAuthorCalendarEventsByDTag(pkHex, dTag);
+  const ids = collectMeetupEventIds(onRelays, [meeting.nostr_event_id]);
+
+  if (ids.length === 0) {
+    await prisma.meeting.update({
+      where: { id: meetingId },
+      data: {
+        nostr_event_id: null,
+        nostr_d_tag: null,
+        nostr_published_at: null,
+        nostr_last_error: null,
+      },
+    });
+    try {
+      await publishCalendarCollection(pkHex);
+    } catch {
+      /* best-effort */
+    }
+    return;
+  }
+
+  let succeeded = 0;
+  let lastError: Error | null = null;
+
+  for (let i = 0; i < ids.length; i++) {
+    try {
+      await requestEventDeletion({
+        eventId: ids[i]!,
+        kind: NOSTR_KIND.TIME_BASED_CALENDAR_EVENT,
+        dTag,
+        updateCollection: i === ids.length - 1,
+        clearMeetingRecord: false,
+      });
+      succeeded++;
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e));
+    }
+  }
+
+  if (succeeded === 0) {
+    throw lastError ?? new Error("Nostr-verwijdering mislukt op alle relays");
   }
 
   await prisma.meeting.update({
@@ -338,14 +467,9 @@ export async function deleteMeetingFromNostr(meetingId: number): Promise<void> {
       nostr_event_id: null,
       nostr_d_tag: null,
       nostr_published_at: null,
+      nostr_last_error: null,
     },
   });
-
-  try {
-    await publishCalendarCollection(pkHex);
-  } catch {
-    /* best-effort */
-  }
 }
 
 export async function findMeetingsDueForPublish(): Promise<number[]> {
@@ -374,6 +498,7 @@ export async function findMeetingsForNostrPublish(
       nostr_event_id: true,
       nostr_published_at: true,
       updated_at: true,
+      tracks: { select: { updated_at: true } },
       items: { select: { updated_at: true } },
     },
     orderBy: { meetup_date: "asc" },
@@ -391,11 +516,7 @@ export async function findMeetingsForNostrPublish(
     if (unpublishedOnly) continue;
 
     const publishedAt = m.nostr_published_at.getTime();
-    if (m.updated_at.getTime() > publishedAt) {
-      due.push(m.id);
-      continue;
-    }
-    if (m.items.some((it) => it.updated_at.getTime() > publishedAt)) {
+    if (meetingChangedSinceNostrPublish(m, publishedAt)) {
       due.push(m.id);
     }
   }

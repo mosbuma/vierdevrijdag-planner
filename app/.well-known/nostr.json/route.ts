@@ -9,7 +9,7 @@ const CORS_HEADERS = {
 };
 
 export async function GET(req: Request) {
-  const doc = buildNip05Json();
+  const doc = await buildNip05Json();
   if (!doc) {
     return NextResponse.json({ error: "Nostr not configured" }, { status: 503, headers: CORS_HEADERS });
   }

@@ -1,90 +1,82 @@
-function requireEnv(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`${name} is not configured`);
-  }
-  return value;
-}
+import {
+  nip05Identifier,
+  parseEventHashtags,
+  parseRelayList,
+} from "@/lib/nostr/settings-schema";
+import { getNostrSettings } from "@/lib/nostr/settings";
 
-export function getNostrRelays(): string[] {
-  const list = requireEnv("NOSTR_RELAYS")
-    .split(",")
-    .map((r) => r.trim())
-    .filter((r) => r.startsWith("wss://") || r.startsWith("ws://"));
+export async function getNostrRelays(): Promise<string[]> {
+  const s = await getNostrSettings();
+  const list = parseRelayList(s.relays);
   if (list.length === 0) {
-    throw new Error("NOSTR_RELAYS must contain at least one wss:// or ws:// URL");
+    throw new Error("Minimaal één wss:// of ws:// relay vereist");
   }
   return list;
 }
 
-export function getNostrProfileName(): string {
-  return requireEnv("NOSTR_PROFILE_NAME");
+export async function getNostrProfileName(): Promise<string> {
+  return (await getNostrSettings()).profile_name;
 }
 
-export function getNostrProfileDisplayName(): string {
-  return requireEnv("NOSTR_PROFILE_DISPLAY_NAME");
+export async function getNostrProfileDisplayName(): Promise<string> {
+  return (await getNostrSettings()).profile_display_name;
 }
 
-export function getNostrProfileAbout(): string {
-  return requireEnv("NOSTR_PROFILE_ABOUT");
+export async function getNostrProfileAbout(): Promise<string> {
+  return (await getNostrSettings()).profile_about;
 }
 
-export function getNostrProfilePictureUrl(): string | undefined {
-  const value = process.env.NOSTR_PROFILE_PICTURE_URL?.trim();
+export async function getNostrProfilePictureUrl(): Promise<string | undefined> {
+  const value = (await getNostrSettings()).profile_picture_url?.trim();
   return value || undefined;
 }
 
-export function getNip05Domain(): string {
-  return requireEnv("NOSTR_NIP05_DOMAIN").replace(/^https?:\/\//, "").replace(/\/$/, "");
+export async function getNip05Domain(): Promise<string> {
+  return (await getNostrSettings()).nip05_domain;
 }
 
-export function getNip05Identifier(): string {
-  return `${getNostrProfileName()}@${getNip05Domain()}`;
+/** Public site origin for URLs embedded in published Nostr events (independent of NEXTAUTH_URL). */
+export async function getNostrContentSiteOrigin(): Promise<string> {
+  return (await getNostrSettings()).content_site_origin.replace(/\/$/, "");
 }
 
-export function getNostrEventHashtags(): string[] {
-  if (process.env.NOSTR_EVENT_HASHTAGS === undefined) {
-    throw new Error("NOSTR_EVENT_HASHTAGS is not configured");
-  }
-  const raw = process.env.NOSTR_EVENT_HASHTAGS.trim();
-  if (raw === "") return [];
-
-  const tags = raw
-    .split(",")
-    .map((t) => t.trim().replace(/^#/, "").toLowerCase())
-    .filter(Boolean);
-
-  return [...new Set(tags)];
+export async function getNip05Identifier(): Promise<string> {
+  const s = await getNostrSettings();
+  return nip05Identifier(s.profile_name, s.nip05_domain);
 }
 
-export function getNostrEventDTagPrefix(): string {
-  return requireEnv("NOSTR_EVENT_D_TAG_PREFIX");
+export async function getNostrEventHashtags(): Promise<string[]> {
+  return parseEventHashtags((await getNostrSettings()).event_hashtags);
 }
 
-export function getNostrCalendarCollectionDTag(): string {
-  return requireEnv("NOSTR_CALENDAR_COLLECTION_D_TAG");
+export async function getNostrEventDTagPrefix(): Promise<string> {
+  return (await getNostrSettings()).event_d_tag_prefix;
 }
 
-export function getNostrCalendarCollectionTitle(): string {
-  return requireEnv("NOSTR_CALENDAR_COLLECTION_TITLE");
+export async function getNostrCalendarCollectionDTag(): Promise<string> {
+  return (await getNostrSettings()).calendar_collection_d_tag;
 }
 
-export function getNostrCalendarCollectionDescription(): string {
-  return requireEnv("NOSTR_CALENDAR_COLLECTION_DESCRIPTION");
+export async function getNostrCalendarCollectionTitle(): Promise<string> {
+  return (await getNostrSettings()).calendar_collection_title;
 }
 
-export function getNostrTimezone(): string {
-  return requireEnv("NOSTR_TIMEZONE");
+export async function getNostrCalendarCollectionDescription(): Promise<string> {
+  return (await getNostrSettings()).calendar_collection_description;
 }
 
-export function getNostrMeetupDefaultStart(): string {
-  return requireEnv("NOSTR_MEETUP_DEFAULT_START");
+export async function getNostrTimezone(): Promise<string> {
+  return (await getNostrSettings()).timezone;
 }
 
-export function getNostrMeetupDefaultEnd(): string {
-  return requireEnv("NOSTR_MEETUP_DEFAULT_END");
+export async function getNostrMeetupDefaultStart(): Promise<string> {
+  return (await getNostrSettings()).meetup_default_start;
 }
 
-export function getNostrDeletionReason(): string {
-  return requireEnv("NOSTR_DELETION_REASON");
+export async function getNostrMeetupDefaultEnd(): Promise<string> {
+  return (await getNostrSettings()).meetup_default_end;
+}
+
+export async function getNostrDeletionReason(): Promise<string> {
+  return (await getNostrSettings()).deletion_reason;
 }
