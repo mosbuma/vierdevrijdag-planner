@@ -1,4 +1,4 @@
-# Synology / NAS — adjust DATABASE_URL and NEXTAUTH_* via env file or environment block.
+# Synology / NAS — adjust DATABASE_URL, NEXTAUTH_*, and NOSTR_* via .env (host) or environment block.
 # Poster JPEGs are stored outside public/ (see POSTER_STORAGE_DIR) so Next.js never scandirs a
 # bad bind mount under public/generated. Bind-mount the storage dir so files persist.
 #
@@ -26,6 +26,9 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3009}
       - POSTER_STORAGE_DIR=/data/posters
+      - NOSTR_NPUB=${NOSTR_NPUB}
+      - NOSTR_NSEC=${NOSTR_NSEC}
+      - NOSTR_CRON_TOKEN=${NOSTR_CRON_TOKEN}
     # Synology mounts are often root-owned; match marcflix-2025 if writes/reads fail for UID 1001.
     user: "0:0"
     volumes:
