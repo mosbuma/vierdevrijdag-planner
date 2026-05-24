@@ -54,6 +54,10 @@ model Meeting {
   /** Sanitized HTML for public event page (bold, italic, links, lists). */
   program_description_html String? @map("program_description_html") @db.LongText
   is_template     Boolean  @default(false) @map("is_template")
+  nostr_event_id     String?   @map("nostr_event_id") @db.Char(64)
+  nostr_d_tag        String?   @map("nostr_d_tag") @db.VarChar(128)
+  nostr_published_at DateTime? @map("nostr_published_at") @db.DateTime(0)
+  nostr_last_error   String?   @map("nostr_last_error") @db.VarChar(1024)
   created_at      DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updated_at      DateTime @updatedAt @map("updated_at") @db.DateTime(0)
 

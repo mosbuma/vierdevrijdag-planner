@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { MeetingRichTextEditor } from "@/components/MeetingRichTextEditor";
+import { PublishToNostrButton } from "@/components/PublishToNostrButton";
+import { amsterdamTodayYmd, isMeetingPublicVisible } from "@/lib/dates";
 
 type Track = { id: number; name: string; sort_order: number };
 type Item = {
@@ -27,6 +29,9 @@ type Meeting = {
   program_description_html?: string | null;
   is_template?: boolean;
   updated_at?: string;
+  nostr_event_id?: string | null;
+  nostr_published_at?: string | null;
+  nostr_last_error?: string | null;
   tracks: Track[];
   items: Item[];
 };
@@ -695,6 +700,18 @@ export function MeetingEditor({
                 </div>
               </div>
               <button type="submit">Gegevens opslaan</button>
+              <PublishToNostrButton
+                meetingId={meeting.id}
+                visibleFromYmd={visible_from}
+                isPubliclyVisible={isMeetingPublicVisible(
+                  new Date(`${visible_from}T12:00:00.000Z`),
+                  amsterdamTodayYmd(),
+                )}
+                isTemplate={meeting.is_template}
+                nostrEventId={meeting.nostr_event_id ?? null}
+                nostrPublishedAt={meeting.nostr_published_at ?? null}
+                nostrLastError={meeting.nostr_last_error ?? null}
+              />
             </form>
 
             <div className="w-full shrink-0 space-y-3 lg:sticky lg:top-4 lg:min-w-[min(100%,22rem)] lg:max-w-xl">

@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { CreateStandardMeetupButton } from "@/components/CreateStandardMeetupButton";
+import { NostrAdminPanel } from "@/components/NostrAdminPanel";
+import { getAuthContext } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { amsterdamTodayYmd, isMeetingPublicVisible, toAmsterdamYmd } from "@/lib/dates";
 
 export default async function AdminHomePage() {
+  const ctx = await getAuthContext();
   const todayYmd = amsterdamTodayYmd();
   const meetings = await prisma.meeting.findMany({
     orderBy: { meetup_date: "desc" },
@@ -19,6 +22,7 @@ export default async function AdminHomePage() {
         </div>
         <CreateStandardMeetupButton />
       </div>
+      {ctx?.isAdmin ? <NostrAdminPanel /> : null}
       <table className="mt-6">
         <thead>
           <tr>

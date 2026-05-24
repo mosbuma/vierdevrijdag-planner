@@ -7,6 +7,7 @@ import { createProgramItemSchema } from "@/lib/validators";
 import { parseTimeToDb } from "@/lib/time-db";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
 import { writeAuditLog } from "@/lib/audit-log";
+import { republishIfDirty } from "@/lib/nostr/publisher";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -54,6 +55,7 @@ export async function POST(req: Request, ctx: Ctx) {
       },
     });
     await syncPosterForMeeting(meetingId);
+    await republishIfDirty(meetingId);
     await writeAuditLog({
       username: auth.username,
       action: "meetings.program-items.POST",

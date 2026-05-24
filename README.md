@@ -83,6 +83,123 @@ Point your reverse proxy at `PORT` (see `Dockerfile` / compose; default in READM
 - **USER**: create/update meetings and program (no deleting meetings).
 - **ADMIN**: full meeting CRUD, user management.
 
+## Nostr (NIP-05 + NIP-52)
+
+The site can publish meetups as NIP-52 calendar events (`kind:31923`) from a server-held key, with NIP-05 identity **`meetup@<domain>`** (see `NOSTR_NIP05_DOMAIN` below).
+
+### Environment variables
+
+All Nostr settings are **required** for publishing (no code defaults). Copy the block from [`.env.example`](.env.example).
+
+| Variable | Purpose |
+|----------|---------|
+| `NOSTR_NPUB` | Public key for `/.well-known/nostr.json` and display. |
+| `NOSTR_NSEC` | Server signing key. Never commit. Must match `NOSTR_NPUB` if both are set. |
+| `NOSTR_RELAYS` | Comma-separated `wss://` relay URLs (at least one). |
+| `NOSTR_CRON_TOKEN` | Bearer secret for `/api/nostr/cron/*` and `npm run nostr:backfill`. |
+| `NOSTR_NIP05_DOMAIN` | Domain for NIP-05 (`meetup@domain`). |
+| `NOSTR_PROFILE_NAME` | NIP-05 local name (e.g. `meetup`). |
+| `NOSTR_PROFILE_DISPLAY_NAME` | kind:0 display name. |
+| `NOSTR_PROFILE_ABOUT` | kind:0 bio text. |
+| `NOSTR_PROFILE_PICTURE_URL` | Optional avatar URL on kind:0 profile. |
+| `NOSTR_EVENT_HASHTAGS` | Comma-separated `t` tags on meetup events. Use empty string for none. |
+| `NOSTR_EVENT_D_TAG_PREFIX` | Prefix for per-meetup `d` tags (e.g. `vierdevrijdag` → `vierdevrijdag-20260626`). |
+| `NOSTR_CALENDAR_COLLECTION_D_TAG` | `d` tag for the kind:31924 collection. |
+| `NOSTR_CALENDAR_COLLECTION_TITLE` | Title on the kind:31924 collection. |
+| `NOSTR_CALENDAR_COLLECTION_DESCRIPTION` | Content on the kind:31924 collection. |
+| `NOSTR_TIMEZONE` | IANA timezone for event times (e.g. `Europe/Amsterdam`). |
+| `NOSTR_MEETUP_DEFAULT_START` | Fallback start time (`HH:mm`) when a meetup has no program slots. |
+| `NOSTR_MEETUP_DEFAULT_END` | Fallback end time (`HH:mm`) when a meetup has no program slots. |
+| `NOSTR_DELETION_REASON` | Text on kind:5 deletion requests. |
+
+### Setup
+
+1. Generate a key pair (once):
+
+   ```bash
+   npm run nostr:keygen
+   ```
+
+   Add `NOSTR_NPUB` and `NOSTR_NSEC` to `.env`. Never commit the nsec.
+
+2. Generate a cron token (once):
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+   Set `NOSTR_CRON_TOKEN` in `.env`. Used by cron, backfill, and `npm run nostr:backfill`.
+
+3. Set every variable in the Nostr block in `.env` (see `.env.example`). Missing values cause publish/NIP-05 operations to fail with a clear error.
+
+4. Apply DB columns (new installs: [`database/init.sql`](database/init.sql); existing DB: [`database/migrations/20260523_nostr_publication_fields.sql`](database/migrations/20260523_nostr_publication_fields.sql) or `npx prisma db push`).
+
+5. Verify NIP-05 (after deploy):
+
+   ```bash
+   curl -sS "https://vierdevrijdag.org/.well-known/nostr.json?name=meetup"
+   ```
+
+   External check: [nip05.dev](https://nip05.dev/) → `meetup@vierdevrijdag.org`.
+
+6. Publish profile once (admin, while logged in):
+
+   ```bash
+   curl -fsS -X POST -b "next-auth.session-token=YOUR_SESSION" \
+     https://vierdevrijdag.org/api/admin/nostr/publish-profile
+   ```
+
+   Or use **Publiceer profiel** / **Alle meetups opnieuw publiceren** on the admin Meetups page (admin only). Re-run after changing profile env vars or `NOSTR_NIP05_DOMAIN`.
+
+### Publishing meetups
+
+- In the meetup editor: **Publiceren op Nostr** (disabled until `visible_from` is today or earlier).
+- After the first publish, edits to the meetup or program auto-republish when saved.
+- Deleting a meetup (admin) sends a Nostr deletion request (`kind:5`).
+
+### Cron (auto-publish newly visible meetups)
+
+Requires `NOSTR_CRON_TOKEN` in `.env`.
+
+```bash
+*/10 * * * * curl -fsS -X POST \
+  -H "Authorization: Bearer $NOSTR_CRON_TOKEN" \
+  https://vierdevrijdag.org/api/nostr/cron/publish-due
+```
+
+Publishes upcoming meetups that are public (`visible_from <= today`) and not yet on Nostr, and republishes those changed since the last Nostr publish.
+
+### Backfill (existing meetups missing Nostr fields)
+
+Requires `NOSTR_CRON_TOKEN` in `.env`. For meetups already in the DB with empty `nostr_event_id`, publish them once and fill the DB columns. Only **public** meetups (`visible_from <= today`) are included; the template meetup is skipped. An empty `attempted: []` response means every eligible meetup already has Nostr fields set.
+
+**Upcoming only** (default — same date filter as cron):
+
+```bash
+npm run nostr:backfill
+```
+
+**Include past meetups** (still requires `visible_from <= today`):
+
+```bash
+npm run nostr:backfill:past
+```
+
+Or via curl (app must be running):
+
+```bash
+curl -fsS -X POST \
+  -H "Authorization: Bearer $NOSTR_CRON_TOKEN" \
+  "http://localhost:3000/api/nostr/cron/backfill"
+
+# with past meetups:
+curl -fsS -X POST \
+  -H "Authorization: Bearer $NOSTR_CRON_TOKEN" \
+  "http://localhost:3000/api/nostr/cron/backfill?includePast=1"
+```
+
+Response lists `attempted`, `succeeded`, and `failed` meeting ids. Each success sets `nostr_event_id`, `nostr_d_tag`, and `nostr_published_at` on that row.
+
 ## Licence
 
 Private project.

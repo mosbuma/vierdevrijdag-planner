@@ -24,6 +24,9 @@ export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
         <Link href="/event?meet=latest" className="text-slate-400 no-underline hover:underline">
           Publieke pagina
         </Link>
+        <Link href="/nostr" className="text-slate-400 no-underline hover:underline">
+          Nostr
+        </Link>
       </nav>
       <SignOutButton />
     </header>

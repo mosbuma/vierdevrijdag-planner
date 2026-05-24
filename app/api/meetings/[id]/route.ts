@@ -8,6 +8,7 @@ import { dateFromYmd } from "@/lib/date-parse";
 import { sanitizeMeetingDescriptionHtml } from "@/lib/meeting-html";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
 import { writeAuditLog } from "@/lib/audit-log";
+import { deleteMeetingFromNostr, republishIfDirty } from "@/lib/nostr/publisher";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -74,6 +75,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     if (needsPosterResync) {
       await syncPosterForMeeting(nid);
     }
+    await republishIfDirty(nid);
     const auditChanges: Record<string, unknown> = { ...parsed.data };
     if (parsed.data.program_description_html !== undefined) {
       auditChanges.program_description_html = data.program_description_html ? "[sanitized html]" : null;
@@ -115,6 +117,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (!row) return jsonError("Not found", 404);
   if (row.is_template) return jsonError("De sjabloonmeetup kan niet worden verwijderd.", 400);
   try {
+    await deleteMeetingFromNostr(nid);
     await prisma.meeting.delete({ where: { id: nid } });
     await writeAuditLog({
       username: auth.username,

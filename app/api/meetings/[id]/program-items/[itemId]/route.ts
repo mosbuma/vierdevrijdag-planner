@@ -7,6 +7,7 @@ import { patchProgramItemSchema } from "@/lib/validators";
 import { parseTimeToDb } from "@/lib/time-db";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
 import { writeAuditLog } from "@/lib/audit-log";
+import { republishIfDirty } from "@/lib/nostr/publisher";
 
 type Ctx = { params: Promise<{ id: string; itemId: string }> };
 
@@ -59,6 +60,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     data,
   });
   await syncPosterForMeeting(meetingId);
+  await republishIfDirty(meetingId);
   await writeAuditLog({
     username: auth.username,
     action: "meetings.program-items.PATCH",
@@ -81,6 +83,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   if (!existing) return jsonError("Not found", 404);
   await prisma.programItem.delete({ where: { id: pid } });
   await syncPosterForMeeting(meetingId);
+  await republishIfDirty(meetingId);
   await writeAuditLog({
     username: auth.username,
     action: "meetings.program-items.DELETE",

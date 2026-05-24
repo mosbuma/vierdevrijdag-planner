@@ -4,6 +4,7 @@ import { jsonError } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { syncPosterForMeeting } from "@/lib/poster/sync-poster";
 import { writeAuditLog } from "@/lib/audit-log";
+import { republishIfDirty } from "@/lib/nostr/publisher";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -17,6 +18,7 @@ export async function POST(_req: Request, ctx: Ctx) {
   if (!exists) return jsonError("Not found", 404);
   try {
     await syncPosterForMeeting(nid);
+    await republishIfDirty(nid);
     await writeAuditLog({
       username: auth.username,
       action: "meetings.poster-regenerate.POST",
